@@ -210,8 +210,7 @@ const App: React.FC = () => {
             startStr,
             endStr,
             ['IPCA', 'IGPM', 'INCC', 'SELIC', 'CDI'],
-            activeAIConfig?.apiKey || '',
-            activeAIConfig?.modelName || ''
+            activeAIConfig?.apiKey || ''
         );
 
         if(newIndices && newIndices.length > 0) {

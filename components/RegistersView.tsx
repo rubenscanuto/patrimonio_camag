@@ -4,7 +4,7 @@ import AssetManager from './AssetManager';
 import TeamManager from './TeamManager';
 import TagManagerView from './TagManagerView';
 import { analyzeDocumentContent } from '../services/geminiService';
-import { Database, Users, Building2, Tag, Key, User, Plus, Trash2, Save, Cpu, ShieldCheck, RefreshCw, Loader2, Search, MapPin, FileBadge, ExternalLink, Info, CheckSquare, X, Pencil, Upload, FileText, Eye, Cloud, FolderOpen, Paperclip, Download, AlertTriangle, Calendar, DollarSign, Sparkles, ChevronDown, ChevronUp, Lock, CloudUpload, Mail, Eraser, CheckCircle } from 'lucide-react';
+import { Database, Users, Building2, Tag, Key, User, Plus, Trash2, RefreshCw, Loader2, Search, MapPin, ExternalLink, Info, CheckSquare, X, Pencil, Upload, FileText, Eye, Cloud, FolderOpen, Paperclip, Download, AlertTriangle, Calendar, DollarSign, Sparkles, ChevronDown, ChevronUp, CheckCircle, Eraser, ShieldCheck } from 'lucide-react';
 
 // --- Helpers ---
 function validateCPF(cpf: string): boolean {
@@ -410,7 +410,7 @@ const RegistersView: React.FC<RegistersViewProps> = (props) => {
   const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); };
   const handleDrop = (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); if (e.dataTransfer.files && e.dataTransfer.files.length > 0) { processFiles(e.dataTransfer.files); } };
   const handlePaste = (e: React.ClipboardEvent) => { if (e.clipboardData.files && e.clipboardData.files.length > 0) { processFiles(e.clipboardData.files); } };
-  const handleUploadAction = async (process: boolean) => { if (pendingFiles.length === 0) return; setIsAnalyzingDoc(true); const tempOwnerId = newOwner.id || Date.now().toString(); if(!newOwner.id) setNewOwner(prev => ({...prev, id: tempOwnerId})); try { for (const pFile of pendingFiles) { const newDoc: Document = { id: Date.now().toString() + Math.random().toString().slice(2,5), name: pFile.name, category: 'Personal', uploadDate: new Date().toLocaleDateString('pt-BR'), summary: process ? 'Extração de dados automática.' : 'Documento anexado manualmente.', relatedOwnerId: tempOwnerId, contentRaw: pFile.content, aiAnalysis: { riskLevel: 'Low', keyDates: [], monetaryValues: [] } }; props.onAddDocument(newDoc); } if (process && props.activeAIConfig) { const combinedContent = pendingFiles.map(f => `--- ${f.name} ---\n${f.content}`).join('\n\n'); const result = await analyzeDocumentContent(combinedContent, props.activeAIConfig.apiKey, props.activeAIConfig.modelName, 'OwnerCreation'); if (result.extractedOwnerData) { const extractedData = result.extractedOwnerData; setNewOwner(prev => ({ ...prev, ...extractedData })); if(extractedData.address) setAddressForm(prev => ({...prev, logradouro: extractedData.address || ''})); alert("Dados extraídos e formulário preenchido!"); } } else if (process && !props.activeAIConfig) { alert("Configure uma chave de API para usar o processamento inteligente."); } else { alert("Documentos anexados com sucesso."); } } catch(e) { console.error(e); alert("Erro ao processar arquivos."); } finally { setIsAnalyzingDoc(false); setPendingFiles([]); } };
+  const handleUploadAction = async (process: boolean) => { if (pendingFiles.length === 0) return; setIsAnalyzingDoc(true); const tempOwnerId = newOwner.id || Date.now().toString(); if(!newOwner.id) setNewOwner(prev => ({...prev, id: tempOwnerId})); try { for (const pFile of pendingFiles) { const newDoc: Document = { id: Date.now().toString() + Math.random().toString().slice(2,5), name: pFile.name, category: 'Personal', uploadDate: new Date().toLocaleDateString('pt-BR'), summary: process ? 'Extração de dados automática.' : 'Documento anexado manualmente.', relatedOwnerId: tempOwnerId, contentRaw: pFile.content, aiAnalysis: { riskLevel: 'Low', keyDates: [], monetaryValues: [] } }; props.onAddDocument(newDoc); } if (process && props.activeAIConfig) { const combinedContent = pendingFiles.map(f => `--- ${f.name} ---\n${f.content}`).join('\n\n'); const result = await analyzeDocumentContent(combinedContent, props.activeAIConfig.apiKey, 'OwnerCreation'); if (result.extractedOwnerData) { const extractedData = result.extractedOwnerData; setNewOwner(prev => ({ ...prev, ...extractedData })); if(extractedData.address) setAddressForm(prev => ({...prev, logradouro: extractedData.address || ''})); alert("Dados extraídos e formulário preenchido!"); } } else if (process && !props.activeAIConfig) { alert("Configure uma chave de API para usar o processamento inteligente."); } else { alert("Documentos anexados com sucesso."); } } catch(e) { console.error(e); alert("Erro ao processar arquivos."); } finally { setIsAnalyzingDoc(false); setPendingFiles([]); } };
   const getOwnerDocuments = () => { if (newOwner.id) { return props.allDocuments.filter(d => d.relatedOwnerId === newOwner.id); } return []; };
   
   // FIX: Added stopPropagation
@@ -646,7 +646,7 @@ const RegistersView: React.FC<RegistersViewProps> = (props) => {
                                                 onDrop={handleDrop}
                                             >
                                                 <div className="flex items-center gap-2 text-indigo-600 font-medium mb-1">
-                                                    <CloudUpload size={20} />
+                                                    <Cloud size={20} />
                                                     <span>Carregamento Inteligente</span>
                                                 </div>
                                                 <p className="text-xs text-indigo-400 text-center max-w-xs">
@@ -973,7 +973,7 @@ const RegistersView: React.FC<RegistersViewProps> = (props) => {
                                         onPaste={handlePaste}
                                     >
                                         <input type="file" multiple className="hidden" ref={fileInputRef} onChange={(e) => e.target.files && processFiles(e.target.files)} />
-                                        <CloudUpload size={48} className="text-indigo-400 mb-4" />
+                                        <Cloud size={48} className="text-indigo-400 mb-4" />
                                         <p className="text-sm font-medium text-slate-700">Clique para selecionar, arraste ou cole arquivos</p>
                                         <p className="text-xs text-slate-400 mt-1">PDF, Imagens, DOCX (para extração automática de dados)</p>
                                     </div>

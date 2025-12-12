@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Property, Document, AIConfig } from '../types';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis } from 'recharts';
 import { generatePortfolioReport } from '../services/geminiService';
@@ -38,7 +38,7 @@ const Dashboard: React.FC<DashboardProps> = ({ properties, documents, aiConfig }
       return;
     }
     setLoadingReport(true);
-    const result = await generatePortfolioReport(properties, aiConfig.apiKey, aiConfig.modelName);
+    const result = await generatePortfolioReport(properties, aiConfig.apiKey);
     setReport(result);
     setLoadingReport(false);
   };

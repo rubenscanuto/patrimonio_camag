@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Document, DocumentCategory, Property, AIConfig, Owner } from '../types';
-import { FileText, Upload, Search, Tag, AlertTriangle, Calendar, DollarSign, Loader2, Filter, User, Building, CheckSquare, Square, Trash2, Eye, X, Download, Save, Sparkles, Eraser, CloudUpload, ChevronDown, CheckCircle, Link } from 'lucide-react';
+import { FileText, Upload, Search, Tag, AlertTriangle, Calendar, DollarSign, Loader2, User, Building, CheckSquare, Square, Trash2, Eye, X, Download, Sparkles, Eraser, ChevronDown, CheckCircle, Link, Cloud } from 'lucide-react';
 import { analyzeDocumentContent } from '../services/geminiService';
 
 interface DocumentVaultProps {
@@ -212,7 +212,7 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({ documents, properties, ow
 
         if (process && aiConfig) {
             try {
-                const analysis = await analyzeDocumentContent(doc.content, aiConfig.apiKey, aiConfig.modelName);
+                const analysis = await analyzeDocumentContent(doc.content, aiConfig.apiKey);
                 aiResult = {
                     category: analysis.category,
                     summary: analysis.summary,
@@ -343,7 +343,7 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({ documents, properties, ow
                     onDrop={handleDrop}
                 >
                     <div className="flex items-center gap-2 text-indigo-600 font-medium mb-1">
-                        <CloudUpload size={24} />
+                        <Cloud size={24} />
                         <span className="text-lg">Carregamento Inteligente</span>
                     </div>
                     <p className="text-sm text-indigo-400 text-center max-w-md">
