@@ -5,7 +5,7 @@ import TeamManager from './TeamManager';
 import TagManagerView from './TagManagerView';
 import SettingsView from './SettingsView';
 import { analyzeDocumentContent } from '../services/geminiService';
-import { Database, Users, Building2, Tag, Key, User, Plus, Trash2, Save, Cloud, ShieldCheck, Loader2, Search, MapPin, FileText, Download, Sparkles, ChevronDown, Camera, X, Briefcase, HelpCircle, Power, PowerOff, RefreshCcw, CloudUpload, Eraser, Pencil, ExternalLink, CheckCircle, Lock, Image as ImageIcon } from 'lucide-react';
+import { Database, Users, Building2, Tag, Key, User, Plus, Trash2, Save, Cloud, ShieldCheck, Loader2, Search, MapPin, FileText, Download, Sparkles, ChevronDown, Camera, X, Briefcase, HelpCircle, Power, PowerOff, RefreshCcw, Eraser, Pencil, ExternalLink, CheckCircle, Lock, Image as ImageIcon } from 'lucide-react';
 import { getNextId } from '../services/idService';
 
 // Constants
@@ -398,8 +398,8 @@ const RegistersView: React.FC<RegistersViewProps> = (props) => {
           let extractedOwner: Partial<Owner> | null = null;
           if (processWithAI && props.activeAIConfig) {
               try {
-                  const analysis = await analyzeDocumentContent(file.content.substring(0, 5000), props.activeAIConfig.apiKey, props.activeAIConfig.modelName, 'OwnerCreation');
-                  aiResult = { category: analysis.category, summary: analysis.summary, riskLevel: analysis.riskLevel, keyDates: analysis.keyDates, monetaryValues: analysis.monetaryValues };
+                  const analysis = await analyzeDocumentContent(file.content.substring(0, 5000), props.activeAIConfig.apiKey, 'OwnerCreation');
+                  aiResult = { category: analysis.category as any, summary: analysis.summary, riskLevel: analysis.riskLevel as any, keyDates: analysis.keyDates as any, monetaryValues: analysis.monetaryValues as any };
                   if (analysis.extractedOwnerData) extractedOwner = analysis.extractedOwnerData;
                   if (analysis.summary) setAiSummary(analysis.summary);
               } catch(e) { console.error(e); }
@@ -913,7 +913,7 @@ const RegistersView: React.FC<RegistersViewProps> = (props) => {
                                                 onClick={() => fileInputRef.current?.click()}
                                             >
                                                 <input type="file" multiple className="hidden" ref={fileInputRef} onChange={handleFileUpload} />
-                                                <CloudUpload size={48} className="mb-4 text-indigo-400"/>
+                                                <Cloud size={48} className="mb-4 text-indigo-400"/>
                                                 <p className="font-medium">Clique ou arraste documentos aqui</p>
                                                 <p className="text-sm opacity-70 mt-1">RG, CPF, Comprovante de Residência, Contrato Social (PDF, Imagens)</p>
                                             </div>

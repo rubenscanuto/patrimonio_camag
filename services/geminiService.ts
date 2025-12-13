@@ -128,11 +128,10 @@ const fetchFromBCB = async (startDate: string, endDate: string, indices: string[
 };
 
 export const fetchHistoricalIndices = async (
-  startDate: string, 
-  endDate: string, 
+  startDate: string,
+  endDate: string,
   indices: string[],
-  apiKey: string,
-  modelName: string
+  apiKey: string
 ): Promise<MonthlyIndexData[]> => {
   
   // 1. Tentar API Oficial

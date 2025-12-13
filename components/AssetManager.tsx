@@ -1,8 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Property, MaintenanceRecord, Document, PropertyTag, AIConfig, MonthlyIndexData, Owner, AddressComponents } from '../types';
-import { Building, MapPin, CheckCircle, XCircle, Wrench, ArrowUpRight, Calendar, User, DollarSign, X, FileText, Upload, Plus, Trash2, Cloud, ScrollText, Camera, Image as ImageIcon, Loader2, Tag, Filter, Pencil, Settings2, Map as MapIcon, Crosshair, Sparkles, TrendingUp, Calculator, Info, List, BarChart3, LineChart as LineChartIcon, AlertTriangle, Eye, Download, Save, Eraser, CloudUpload, ChevronDown, Search } from 'lucide-react';
+import { Building, MapPin, CheckCircle, XCircle, Wrench, ArrowUpRight, Calendar, User, DollarSign, X, FileText, Upload, Plus, Trash2, Cloud, ScrollText, Camera, Image as ImageIcon, Loader2, Tag, Filter, Pencil, Settings2, Map as MapIcon, Crosshair, Sparkles, TrendingUp, Calculator, Info, List, BarChart3, LineChart as LineChartIcon, AlertTriangle, Eye, Download, Save, Eraser, ChevronDown, Search } from 'lucide-react';
 import { analyzeDocumentContent, extractCustomFieldFromText, getCoordinatesFromAddress, calculateCorrectionFromLocalData, IndexCorrectionResult, fetchHistoricalIndices } from '../services/geminiService';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { getNextId } from '../services/idService';
 
 interface AssetManagerProps {
@@ -401,11 +400,10 @@ const AssetManager: React.FC<AssetManagerProps> = ({
              
              try {
                 const newIndices = await fetchHistoricalIndices(
-                    fetchStart, 
-                    fetchEnd, 
-                    ['IPCA', 'IGPM', 'INCC', 'SELIC', 'CDI'], 
-                    aiConfig?.apiKey || '', 
-                    aiConfig?.modelName || ''
+                    fetchStart,
+                    fetchEnd,
+                    ['IPCA', 'IGPM', 'INCC', 'SELIC', 'CDI'],
+                    aiConfig?.apiKey || ''
                 );
                 
                 if (newIndices && newIndices.length > 0) {
@@ -483,7 +481,7 @@ const AssetManager: React.FC<AssetManagerProps> = ({
     }
 
     setIsLocating(true);
-    const coords = await getCoordinatesFromAddress(constructedAddress, aiConfig.apiKey, aiConfig.modelName);
+    const coords = await getCoordinatesFromAddress(constructedAddress, aiConfig.apiKey);
     
     if (coords) {
       setNewProp(prev => ({
@@ -505,7 +503,7 @@ const AssetManager: React.FC<AssetManagerProps> = ({
     }
 
     setIsGeneratingMapDetail(true);
-    const coords = await getCoordinatesFromAddress(selectedProperty.address, aiConfig.apiKey, aiConfig.modelName);
+    const coords = await getCoordinatesFromAddress(selectedProperty.address, aiConfig.apiKey);
 
     if (coords) {
       const updatedProp = { ...selectedProperty, coordinates: coords };
@@ -594,7 +592,7 @@ const AssetManager: React.FC<AssetManagerProps> = ({
     const combinedText = textFiles.map(f => `--- Arquivo: ${f.name} ---\n${f.content.substring(0, 5000)}`).join('\n\n');
     
     try {
-        const result = await analyzeDocumentContent(combinedText, aiConfig.apiKey, aiConfig.modelName, 'PropertyCreation');
+        const result = await analyzeDocumentContent(combinedText, aiConfig.apiKey, 'PropertyCreation');
         
         // Show summary side-by-side
         if (result.summary) {
@@ -707,7 +705,7 @@ const AssetManager: React.FC<AssetManagerProps> = ({
           const fullText = docs.map(d => d.contentRaw || d.summary || '').join('\n');
           
           if (fullText.length > 10) {
-             const extracted = await extractCustomFieldFromText(fullText, pendingField.key, aiConfig.apiKey, aiConfig.modelName);
+             const extracted = await extractCustomFieldFromText(fullText, pendingField.key, aiConfig.apiKey);
              if (extracted) valueToAdd = extracted;
           }
         }
@@ -1271,7 +1269,7 @@ const AssetManager: React.FC<AssetManagerProps> = ({
                             
                             {pendingUploads.length === 0 ? (
                                 <button onClick={() => fileInputRef.current?.click()} className="flex flex-col items-center gap-2 text-slate-600 hover:text-indigo-600 transition-colors w-full">
-                                    <CloudUpload size={40} className="text-indigo-500 opacity-80" />
+                                    <Cloud size={40} className="text-indigo-500 opacity-80" />
                                     <div className="text-center">
                                         <span className="font-medium text-sm">Clique para selecionar, arraste ou cole arquivos</span>
                                         <p className="text-xs text-slate-400 mt-1">PDF, DOCX, Escritura (para extração de dados e arquivamento)</p>
