@@ -1,9 +1,9 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
-import { AIAnalysisResult, Property, MonthlyIndexData } from "../types";
+import { GoogleGenAI, Type } from "@google/genai";
+import { AIAnalysisResult, DocumentCategory, Property, MonthlyIndexData, Owner } from "../types";
 
 // Helper para instanciar o cliente com a chave dinâmica
 const getAIClient = (apiKey: string) => {
-  return new GoogleGenerativeAI(apiKey).getGenerativeModel({ model: "gemini-2.5-flash" });
+  return new GoogleGenAI({ apiKey });
 };
 
 export interface IndexCorrectionResult {
@@ -92,7 +92,7 @@ const fetchFromBCB = async (startDate: string, endDate: string, indices: string[
             
             if (Array.isArray(data)) {
                 data.forEach((item: any) => {
-                    const [, m, y] = item.data.split('/');
+                    const [d, m, y] = item.data.split('/');
                     const key = `${y}-${m}`;
                     const valStr = String(item.valor).replace(',', '.');
                     const val = parseFloat(valStr);
@@ -128,10 +128,11 @@ const fetchFromBCB = async (startDate: string, endDate: string, indices: string[
 };
 
 export const fetchHistoricalIndices = async (
-  startDate: string,
-  endDate: string,
+  startDate: string, 
+  endDate: string, 
   indices: string[],
-  apiKey: string
+  apiKey: string,
+  modelName: string
 ): Promise<MonthlyIndexData[]> => {
   
   // 1. Tentar API Oficial
@@ -146,8 +147,30 @@ export const fetchHistoricalIndices = async (
   if (apiKey && indices.length > 0) {
       try {
         const ai = getAIClient(apiKey);
-        const response = await ai.generateContent(`Return JSON array of monthly percentage rates for ${indices.join(', ')} from ${startDate} to ${endDate}. Format: [{ "date": "YYYY-MM", "indices": { "IPCA": 0.5 } }]. Estimates allowed.`);
-        if (response.response.text()) return JSON.parse(response.response.text());
+        const response = await ai.models.generateContent({
+          model: modelName || "gemini-2.5-flash",
+          contents: `Return JSON array of monthly percentage rates for ${indices.join(', ')} from ${startDate} to ${endDate}. Format: [{ "date": "YYYY-MM", "indices": { "IPCA": 0.5 } }]. Estimates allowed.`,
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  date: { type: Type.STRING },
+                  indices: { type: Type.OBJECT, properties: {
+                       IPCA: { type: Type.NUMBER, nullable: true },
+                       IGPM: { type: Type.NUMBER, nullable: true },
+                       INCC: { type: Type.NUMBER, nullable: true },
+                       SELIC: { type: Type.NUMBER, nullable: true },
+                       CDI: { type: Type.NUMBER, nullable: true },
+                  }}
+                }
+              }
+            }
+          }
+        });
+        if (response.text) return JSON.parse(response.text);
       } catch (e) {
         console.error("AI Fetch failed", e);
       }
@@ -170,8 +193,11 @@ export const calculateCorrectionFromLocalData = (
   const end = new Date(endDateStr);
   
   const startKey = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`;
-  const endKey = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, '0')}`;
+  let endKey = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, '0')}`;
 
+  let commonMaxDate = endKey; 
+  // Simplified logic for robustness
+  
   const results: IndexCorrectionResult[] = [];
 
   selectedIndices.forEach(index => {
@@ -202,51 +228,122 @@ export const calculateCorrectionFromLocalData = (
 };
 
 // ... (Other functions kept identical but ensuring robust exports)
-export const getCoordinatesFromAddress = async (address: string, apiKey: string): Promise<{lat: number, lng: number} | null> => {
+export const getCoordinatesFromAddress = async (address: string, apiKey: string, modelName: string): Promise<{lat: number, lng: number} | null> => {
   if (!apiKey || !address) return null;
   try {
     const ai = getAIClient(apiKey);
-    const response = await ai.generateContent(`Identify lat/lng for: "${address}". Return JSON {lat, lng}.`);
-    return response.response.text() ? JSON.parse(response.response.text()) : null;
+    const response = await ai.models.generateContent({
+      model: modelName || "gemini-2.5-flash",
+      contents: `Identify lat/lng for: "${address}". Return JSON {lat, lng}.`,
+      config: { responseMimeType: "application/json" }
+    });
+    return response.text ? JSON.parse(response.text) : null;
   } catch (e) { return null; }
 };
 
-export const extractCustomFieldFromText = async (text: string, fieldName: string, apiKey: string): Promise<string | null> => {
+export const extractCustomFieldFromText = async (text: string, fieldName: string, apiKey: string, modelName: string): Promise<string | null> => {
   if (!apiKey) return null;
   try {
     const ai = getAIClient(apiKey);
-    const response = await ai.generateContent(`Find value for "${fieldName}" in text: "${text}". Return JSON {value: string|null}.`);
-    const res = JSON.parse(response.response.text() || "{}");
+    const response = await ai.models.generateContent({
+      model: modelName || "gemini-2.5-flash",
+      contents: `Find value for "${fieldName}" in text: "${text}". Return JSON {value: string|null}.`,
+      config: { responseMimeType: "application/json" }
+    });
+    const res = JSON.parse(response.text || "{}");
     return res.value === "null" ? null : res.value;
   } catch (e) { return null; }
 };
 
-export const analyzeDocumentContent = async (text: string, apiKey: string, type: 'General' | 'PropertyCreation' | 'OwnerCreation' = 'General'): Promise<AIAnalysisResult> => {
+export const analyzeDocumentContent = async (text: string, apiKey: string, modelName: string, type: 'General' | 'PropertyCreation' | 'OwnerCreation' = 'General'): Promise<AIAnalysisResult> => {
   if (!apiKey) throw new Error("API Key required");
   const ai = getAIClient(apiKey);
+  const model = modelName || "gemini-2.5-flash";
+  
+  // Simplified schema for robustness
+  const baseSchema = {
+      type: Type.OBJECT,
+      properties: {
+          category: { type: Type.STRING, enum: ['Legal', 'Financial', 'Maintenance', 'Tax', 'Acquisition', 'Uncategorized', 'Personal'] },
+          summary: { type: Type.STRING },
+          riskLevel: { type: Type.STRING, enum: ['Low', 'Medium', 'High'] },
+          keyDates: { type: Type.ARRAY, items: { type: Type.STRING } },
+          monetaryValues: { type: Type.ARRAY, items: { type: Type.STRING } }
+      }
+  };
 
   let prompt = `Analyze: ${text}`;
+  let schema: any = baseSchema;
 
   if (type === 'OwnerCreation') {
       prompt = `Extract owner data from: ${text}`;
+      schema = {
+          type: Type.OBJECT,
+          properties: {
+              ...baseSchema.properties,
+              extractedOwnerData: {
+                  type: Type.OBJECT,
+                  properties: {
+                      name: { type: Type.STRING },
+                      document: { type: Type.STRING },
+                      rg: { type: Type.STRING },
+                      municipalRegistration: { type: Type.STRING },
+                      address: { type: Type.STRING },
+                      email: { type: Type.STRING },
+                      phone: { type: Type.STRING },
+                      profession: { type: Type.STRING },
+                      naturality: { type: Type.STRING },
+                      maritalStatus: { type: Type.STRING }
+                  }
+              }
+          }
+      };
   } else if (type === 'PropertyCreation') {
       prompt = `Extract property data from: ${text}`;
+      schema = {
+          type: Type.OBJECT,
+          properties: {
+              ...baseSchema.properties,
+              extractedPropertyData: {
+                  type: Type.OBJECT,
+                  properties: {
+                      name: { type: Type.STRING },
+                      address: { type: Type.STRING },
+                      purchaseValue: { type: Type.NUMBER },
+                      purchaseDate: { type: Type.STRING },
+                      seller: { type: Type.STRING },
+                      registryData: { type: Type.OBJECT, properties: { matricula: { type: Type.STRING }, cartorio: { type: Type.STRING }, livro: { type: Type.STRING }, folha: { type: Type.STRING } } }
+                  }
+              },
+              extractedOwnerData: {
+                  type: Type.OBJECT, 
+                  properties: { name: { type: Type.STRING }, document: { type: Type.STRING } }
+              }
+          }
+      };
   }
 
   try {
-      const response = await ai.generateContent(prompt);
-      return JSON.parse(response.response.text() || "{}");
+      const response = await ai.models.generateContent({
+          model,
+          contents: prompt,
+          config: { responseMimeType: "application/json", responseSchema: schema }
+      });
+      return JSON.parse(response.text || "{}");
   } catch (e) {
       console.error(e);
       return { category: 'Uncategorized', summary: 'Analysis Failed', riskLevel: 'Low', keyDates: [], monetaryValues: [] };
   }
 };
 
-export const generatePortfolioReport = async (properties: Property[], apiKey: string): Promise<string> => {
+export const generatePortfolioReport = async (properties: Property[], apiKey: string, modelName: string): Promise<string> => {
     if (!apiKey) return "<p>API Key required</p>";
     try {
         const ai = getAIClient(apiKey);
-        const res = await ai.generateContent(`Summarize portfolio (HTML): ${JSON.stringify(properties.map(p => ({name: p.name, val: p.value, status: p.status})))}`);
-        return res.response.text() || "";
+        const res = await ai.models.generateContent({
+            model: modelName || "gemini-2.5-flash",
+            contents: `Summarize portfolio (HTML): ${JSON.stringify(properties.map(p => ({name: p.name, val: p.value, status: p.status})))}`
+        });
+        return res.text || "";
     } catch(e) { return "<p>Report gen failed</p>"; }
 };

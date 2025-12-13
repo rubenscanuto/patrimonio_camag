@@ -1,16 +1,26 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Employee } from '../types';
-import { Users, Phone, ShieldCheck, Mail, Briefcase, Plus, CheckSquare, Eraser, ChevronDown } from 'lucide-react';
+import { Users, Phone, ShieldCheck, Mail, Briefcase, Plus, CheckSquare, Eraser, ChevronDown, User, X } from 'lucide-react';
+import { getNextId } from '../services/idService';
 
 interface TeamManagerProps {
   employees: Employee[];
   onAddEmployee: (emp: Employee) => void;
 }
 
-// Reusable Clearable Input Component
 interface ClearableInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   onClear: () => void;
 }
+
+// Helper for Phone Mask (XX) XXXXX-XXXX
+const formatPhone = (value: string) => {
+  const v = value.replace(/\D/g, '');
+  if (v.length > 11) return v.replace(/^(\d{2})(\d{5})(\d{4}).*/, '($1) $2-$3');
+  if (v.length > 10) return v.replace(/^(\d{2})(\d{5})(\d{4}).*/, '($1) $2-$3');
+  if (v.length > 6) return v.replace(/^(\d{2})(\d{4})(\d{0,4}).*/, '($1) $2-$3');
+  if (v.length > 2) return v.replace(/^(\d{2})(\d{0,5}).*/, '($1) $2');
+  return v;
+};
 
 const ClearableInput: React.FC<ClearableInputProps> = ({ onClear, className = "", ...props }) => {
   return (
@@ -34,7 +44,6 @@ const ClearableInput: React.FC<ClearableInputProps> = ({ onClear, className = ""
   );
 };
 
-// Searchable Select Component
 interface SearchableSelectProps {
   options: { value: string; label: string }[];
   value: string;
@@ -60,7 +69,7 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({ options, value, onC
       <div className="relative">
          <input
             type="text"
-            className={`w-full ${className} pr-8 cursor-pointer border border-slate-300 rounded p-2 outline-none focus:border-indigo-500`}
+            className={`w-full ${className} pr-8 cursor-pointer border border-slate-300 rounded p-2 outline-none focus:border-indigo-500 bg-white`}
             placeholder={placeholder}
             value={searchTerm}
             onChange={(e) => { setSearchTerm(e.target.value); setIsOpen(true); }}
@@ -104,8 +113,11 @@ const TeamManager: React.FC<TeamManagerProps> = ({ employees, onAddEmployee }) =
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (newEmp.name && newEmp.role) {
+      // Gera ID sequencial com prefixo 'C' (Colaborador)
+      const newId = getNextId('Employee');
+      
       onAddEmployee({
-        id: Date.now().toString(),
+        id: newId,
         name: newEmp.name,
         role: newEmp.role,
         assignedProperties: [],
@@ -134,119 +146,89 @@ const TeamManager: React.FC<TeamManagerProps> = ({ employees, onAddEmployee }) =
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {employees.map((emp) => (
-          <div key={emp.id} className="bg-white p-0 rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
-            <div className="p-6 flex items-start gap-4">
-               <div className="relative">
-                 <div className="w-16 h-16 bg-indigo-50 rounded-full flex items-center justify-center text-indigo-400">
-                   <Users size={28} />
+        {employees.map(emp => (
+          <div key={emp.id} className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 hover:shadow-md transition-shadow">
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex items-center gap-3">
+                 <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600">
+                    <User size={20} />
                  </div>
-                 <div className={`absolute bottom-0 right-0 w-4 h-4 border-2 border-white rounded-full ${emp.status === 'Active' ? 'bg-green-500' : 'bg-slate-400'}`}></div>
-               </div>
-               <div className="flex-1">
-                 <h3 className="font-bold text-lg text-slate-800">{emp.name}</h3>
-                 <span className="inline-block px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-xs font-semibold mb-2">
-                   {emp.role}
-                 </span>
-                 <div className="space-y-1">
-                    <p className="text-xs text-slate-500 flex items-center gap-2">
-                      <Phone size={12} /> {emp.contact}
-                    </p>
-                    <p className="text-xs text-slate-500 flex items-center gap-2 truncate">
-                      <Mail size={12} /> {emp.name.split(' ')[0].toLowerCase()}@patrimonio.com
-                    </p>
+                 <div>
+                    <h3 className="font-bold text-slate-800">{emp.name}</h3>
+                    <p className="text-xs text-slate-500">{emp.role}</p>
+                    <p className="text-[10px] text-slate-400 font-mono mt-0.5">ID: {emp.id}</p>
                  </div>
-               </div>
+              </div>
+              <span className={`px-2 py-1 rounded-full text-xs font-bold ${emp.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
+                {emp.status === 'Active' ? 'Ativo' : 'Afastado'}
+              </span>
             </div>
             
-            {/* Task / Control Section */}
-            <div className="bg-slate-50 p-4 border-t border-slate-100 mt-auto">
-              <div className="flex justify-between items-center">
-                 <div className="flex items-center gap-2 text-sm text-slate-600">
-                    <CheckSquare size={16} />
-                    <span className="font-medium">Tarefas Ativas</span>
-                 </div>
-                 <span className={`px-2 py-1 rounded text-xs font-bold ${
-                   emp.activeTasks > 4 ? 'bg-red-100 text-red-700' : 
-                   emp.activeTasks > 0 ? 'bg-blue-100 text-blue-700' : 'bg-slate-200 text-slate-500'
-                 }`}>
-                   {emp.activeTasks} pendentes
-                 </span>
-              </div>
-              <div className="w-full bg-slate-200 h-1.5 rounded-full mt-3 overflow-hidden">
-                <div 
-                  className={`h-full rounded-full ${emp.activeTasks > 4 ? 'bg-red-500' : 'bg-blue-500'}`} 
-                  style={{ width: `${Math.min(emp.activeTasks * 20, 100)}%` }}
-                ></div>
-              </div>
-              <button className="w-full mt-3 py-1.5 text-xs font-medium border border-slate-200 bg-white rounded text-slate-600 hover:bg-slate-50">
-                Gerenciar Atividades
-              </button>
+            <div className="space-y-2 text-sm text-slate-600">
+                <div className="flex items-center gap-2">
+                    <Phone size={14} className="text-slate-400"/>
+                    <span>{emp.contact || 'Sem contato'}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                    <Briefcase size={14} className="text-slate-400"/>
+                    <span>{emp.activeTasks} tarefas ativas</span>
+                </div>
             </div>
           </div>
         ))}
-      </div>
-      
-      {/* Visual placeholder for payroll/logs */}
-      <div className="mt-8 bg-indigo-900 rounded-xl p-8 text-white relative overflow-hidden">
-        <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
-          <div>
-            <h3 className="text-xl font-bold mb-2">Relatório de Produtividade</h3>
-            <p className="text-indigo-200 max-w-md">Os logs de acesso e conclusão de tarefas deste mês já estão disponíveis para exportação.</p>
-          </div>
-          <button className="bg-white text-indigo-900 px-6 py-2 rounded-lg font-bold hover:bg-indigo-50 transition-colors">
-            Baixar Relatório PDF
-          </button>
-        </div>
-        <Briefcase size={200} className="absolute -right-10 -bottom-20 text-indigo-800 opacity-20 rotate-12" />
+        {employees.length === 0 && (
+            <div className="col-span-full py-12 text-center text-slate-400 bg-white rounded-xl border border-dashed border-slate-300">
+                <Users size={48} className="mx-auto mb-3 opacity-20"/>
+                <p>Nenhum colaborador cadastrado.</p>
+            </div>
+        )}
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl p-6 w-full max-w-md animate-in zoom-in-95">
-            <h3 className="text-xl font-bold mb-4">Adicionar Colaborador</h3>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700">Nome Completo</label>
-                <ClearableInput required type="text" className="w-full border p-2 rounded" 
-                  value={newEmp.name || ''}
-                  onChange={e => setNewEmp({...newEmp, name: e.target.value})}
-                  onClear={() => setNewEmp({...newEmp, name: ''})}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700">Função/Cargo</label>
-                <ClearableInput required type="text" className="w-full border p-2 rounded"
-                  value={newEmp.role || ''}
-                  onChange={e => setNewEmp({...newEmp, role: e.target.value})} 
-                  onClear={() => setNewEmp({...newEmp, role: ''})}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700">Telefone</label>
-                <ClearableInput required type="text" className="w-full border p-2 rounded"
-                  value={newEmp.contact || ''}
-                  onChange={e => setNewEmp({...newEmp, contact: e.target.value})} 
-                  onClear={() => setNewEmp({...newEmp, contact: ''})}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700">Status</label>
-                <SearchableSelect 
-                    options={[
-                        { value: 'Active', label: 'Ativo' },
-                        { value: 'On Leave', label: 'Licença/Férias' }
-                    ]}
-                    value={newEmp.status || 'Active'}
-                    onChange={(val) => setNewEmp({...newEmp, status: val as any})}
-                />
-              </div>
-              <div className="flex justify-end gap-2 mt-6">
-                <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded">Cancelar</button>
-                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">Salvar</button>
-              </div>
-            </form>
-          </div>
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-xl w-full max-w-md shadow-2xl animate-in zoom-in-95">
+                <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-xl">
+                    <h3 className="font-bold text-slate-800">Novo Colaborador</h3>
+                    <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>
+                </div>
+                <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                    <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-1">Nome Completo</label>
+                        <ClearableInput required value={newEmp.name || ''} onChange={e => setNewEmp({...newEmp, name: e.target.value})} onClear={() => setNewEmp({...newEmp, name: ''})} className="border-slate-300 border p-2 rounded"/>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-1">Função / Cargo</label>
+                        <ClearableInput required value={newEmp.role || ''} onChange={e => setNewEmp({...newEmp, role: e.target.value})} onClear={() => setNewEmp({...newEmp, role: ''})} className="border-slate-300 border p-2 rounded"/>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-1">Contato (Tel/Email)</label>
+                        <ClearableInput 
+                            value={newEmp.contact || ''} 
+                            onChange={e => {
+                                const val = e.target.value;
+                                // Basic heuristic: if it looks like email, lowercase it; if number, mask it
+                                if (val.includes('@')) {
+                                    setNewEmp({...newEmp, contact: val.toLowerCase()});
+                                } else {
+                                    setNewEmp({...newEmp, contact: formatPhone(val)});
+                                }
+                            }} 
+                            onClear={() => setNewEmp({...newEmp, contact: ''})} 
+                            className="border-slate-300 border p-2 rounded"
+                            placeholder="(82) 99999-9999 ou email@exemplo.com"
+                        />
+                    </div>
+                     <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-1">Status</label>
+                        <SearchableSelect 
+                            options={[{ value: 'Active', label: 'Ativo' }, { value: 'On Leave', label: 'Afastado' }]}
+                            value={newEmp.status || 'Active'}
+                            onChange={(val) => setNewEmp({...newEmp, status: val as any})}
+                        />
+                    </div>
+                    <button type="submit" className="w-full bg-indigo-600 text-white py-2 rounded-lg font-bold hover:bg-indigo-700 mt-2">Salvar Colaborador</button>
+                </form>
+            </div>
         </div>
       )}
     </div>

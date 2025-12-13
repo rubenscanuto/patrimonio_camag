@@ -22,6 +22,12 @@ export interface PropertyTag {
   color: 'blue' | 'green' | 'red' | 'yellow' | 'purple' | 'gray' | 'pink' | 'indigo';
 }
 
+export interface CnaeData {
+  code: string;
+  text: string;
+  isPrimary: boolean;
+}
+
 export interface Owner {
   id: string;
   name: string;
@@ -35,6 +41,9 @@ export interface Owner {
   municipalRegistration?: string; // Inscrição Municipal
   address?: string;
   legalRepresentative?: string; // Representante Legal para PJ
+  legalRepresentativeCpf?: string; // CPF do Representante Legal
+  photoUrl?: string;
+  cnaes?: CnaeData[];
 }
 
 export interface AddressComponents {
@@ -126,12 +135,13 @@ export interface AIConfig {
 }
 
 // Configurações de Nuvem
-export type CloudProvider = 'Google Drive' | 'OneDrive' | 'Dropbox';
+export type CloudProvider = 'Google Drive' | 'OneDrive' | 'Dropbox' | 'Outras' | string;
 
 export interface CloudAccount {
   id: string;
   provider: CloudProvider;
   accountName: string; // email ou nome de usuário
+  credentials?: Record<string, string>; // Client ID, Secret, etc.
   isConnected: boolean;
   authDate: string;
 }
@@ -151,4 +161,24 @@ export interface MonthlyIndexData {
 export interface IndicesDatabase {
   lastUpdated: string;
   data: MonthlyIndexData[];
+}
+
+// Logs e Auditoria
+export interface LogEntry {
+  id: string;
+  timestamp: string;
+  action: 'Create' | 'Update' | 'Delete' | 'Restore' | 'Analysis';
+  entityType: 'Property' | 'Document' | 'Owner' | 'Employee' | 'Tag' | 'System';
+  description: string;
+  user?: string; // Nome do usuário que realizou a ação
+  details?: string;
+}
+
+// Lixeira / Recuperação
+export interface TrashItem {
+  id: string; // ID original do item
+  deletedAt: string;
+  originalData: any; // O objeto completo que foi excluído
+  entityType: 'Property' | 'Document' | 'Owner' | 'Employee' | 'Tag' | 'CloudAccount';
+  name: string; // Para exibição facilitada
 }

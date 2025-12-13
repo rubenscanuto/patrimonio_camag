@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Document, DocumentCategory, Property, AIConfig, Owner } from '../types';
-import { FileText, Upload, Search, Tag, AlertTriangle, Calendar, DollarSign, Loader2, User, Building, CheckSquare, Square, Trash2, Eye, X, Download, Sparkles, Eraser, ChevronDown, CheckCircle, Link, Cloud } from 'lucide-react';
+import { FileText, Upload, Search, Tag, AlertTriangle, Calendar, DollarSign, Loader2, Filter, User, Building, CheckSquare, Square, Trash2, Eye, X, Download, Save, Sparkles, Eraser, CloudUpload, ChevronDown, CheckCircle, Link } from 'lucide-react';
 import { analyzeDocumentContent } from '../services/geminiService';
+import { getNextId } from '../services/idService';
 
 interface DocumentVaultProps {
   documents: Document[];
@@ -212,7 +213,7 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({ documents, properties, ow
 
         if (process && aiConfig) {
             try {
-                const analysis = await analyzeDocumentContent(doc.content, aiConfig.apiKey);
+                const analysis = await analyzeDocumentContent(doc.content, aiConfig.apiKey, aiConfig.modelName);
                 aiResult = {
                     category: analysis.category,
                     summary: analysis.summary,
@@ -238,7 +239,7 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({ documents, properties, ow
         }
 
         const newDoc: Document = {
-          id: Date.now().toString() + Math.random().toString().slice(2,5),
+          id: getNextId('Document'),
           name: doc.name,
           uploadDate: new Date().toLocaleDateString('pt-BR'),
           contentRaw: doc.content,
@@ -343,7 +344,7 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({ documents, properties, ow
                     onDrop={handleDrop}
                 >
                     <div className="flex items-center gap-2 text-indigo-600 font-medium mb-1">
-                        <Cloud size={24} />
+                        <CloudUpload size={24} />
                         <span className="text-lg">Carregamento Inteligente</span>
                     </div>
                     <p className="text-sm text-indigo-400 text-center max-w-md">
@@ -497,6 +498,7 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({ documents, properties, ow
                   </div>
                   <div>
                     <h4 className="font-semibold text-slate-900 text-lg">{doc.name}</h4>
+                    <p className="text-xs text-slate-400 font-mono mb-1">ID: {doc.id}</p>
                     <div className="flex flex-wrap items-center gap-3 text-sm text-slate-500 mb-2 mt-1">
                       <span className="flex items-center gap-1"><Calendar size={12}/> {doc.uploadDate}</span>
                       

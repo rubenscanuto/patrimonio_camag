@@ -1,23 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, FolderOpen, Database, Building2 } from 'lucide-react';
+import { LayoutDashboard, FolderOpen, Database, Building2, ClipboardList } from 'lucide-react';
 import Dashboard from './components/Dashboard';
 import DocumentVault from './components/DocumentVault';
 import RegistersView from './components/RegistersView';
 import AssetManager from './components/AssetManager';
-import { Property, Document, Employee, PropertyTag, AIConfig, UserProfile, MonthlyIndexData, Owner, CloudAccount } from './types';
+import AuditView from './components/AuditView';
+import { Property, Document, Employee, PropertyTag, AIConfig, UserProfile, MonthlyIndexData, Owner, CloudAccount, LogEntry, TrashItem } from './types';
 import { fetchHistoricalIndices } from './services/geminiService';
+import { getNextId } from './services/idService';
 
 // Initial Tags
 const INITIAL_TAGS: PropertyTag[] = [
-  { id: 't1', label: 'Em Reforma', color: 'yellow' },
-  { id: 't2', label: 'Alugado', color: 'green' },
-  { id: 't3', label: 'Venda Pendente', color: 'purple' },
+  { id: 'E_1', label: 'Em Reforma', color: 'yellow' },
+  { id: 'E_2', label: 'Alugado', color: 'green' },
+  { id: 'E_3', label: 'Venda Pendente', color: 'purple' },
 ];
 
 // Mock Initial Data - Enhanced for detail views
 const INITIAL_PROPERTIES: Property[] = [
   { 
-    id: '1', 
+    id: 'I_1', 
     name: 'Edifício Horizon', 
     address: 'Av. Paulista, 1000 - SP', 
     value: 15000000, 
@@ -30,14 +32,14 @@ const INITIAL_PROPERTIES: Property[] = [
     seller: 'Construtora ABC',
     registryData: { matricula: '123.456', cartorio: '4º Registro de Imóveis SP', livro: '2', folha: '120' },
     customFields: { 'Voltagem': '220v', 'Vagas Garagem': '10 Fixas' },
-    tags: ['t2'],
+    tags: ['E_2'],
     maintenanceHistory: [
       { id: 'm1', date: '10/01/2024', description: 'Manutenção Elevadores', cost: 4500, status: 'Completed' },
       { id: 'm2', date: '01/02/2024', description: 'Revisão Sistema Incêndio', cost: 1200, status: 'Pending' }
     ]
   },
   { 
-    id: '2', 
+    id: 'I_2', 
     name: 'Galpão Industrial Zona Norte', 
     address: 'Rua das Indústrias, 400 - SP', 
     value: 4500000, 
@@ -51,7 +53,7 @@ const INITIAL_PROPERTIES: Property[] = [
     maintenanceHistory: []
   },
   { 
-    id: '3', 
+    id: 'I_3', 
     name: 'Residencial Villa Verde', 
     address: 'Al. das Flores, 55 - Interior', 
     value: 2800000, 
@@ -61,7 +63,7 @@ const INITIAL_PROPERTIES: Property[] = [
     imageUrl: 'https://picsum.photos/400/300?random=3',
     tenantName: 'Família Souza',
     contractExpiry: '05/2026',
-    tags: ['t1'],
+    tags: ['E_1'],
     maintenanceHistory: [
        { id: 'm3', date: '15/02/2024', description: 'Troca de Telhado', cost: 18000, status: 'Pending' }
     ]
@@ -70,11 +72,11 @@ const INITIAL_PROPERTIES: Property[] = [
 
 const INITIAL_DOCUMENTS: Document[] = [
   { 
-    id: '1', 
+    id: 'D_1', 
     name: 'Contrato Locação - Horizon', 
     category: 'Legal', 
     uploadDate: '12/02/2024', 
-    relatedPropertyId: '1',
+    relatedPropertyId: 'I_1',
     summary: 'Contrato de 5 anos com Multinacional X.',
     aiAnalysis: {
         riskLevel: 'Low',
@@ -83,11 +85,11 @@ const INITIAL_DOCUMENTS: Document[] = [
     }
   },
   { 
-    id: '2', 
+    id: 'D_2', 
     name: 'IPTU 2024 - Galpão', 
     category: 'Tax', 
     uploadDate: '15/01/2024', 
-    relatedPropertyId: '2',
+    relatedPropertyId: 'I_2',
     summary: 'Guia parcela única paga.',
     aiAnalysis: {
         riskLevel: 'Low',
@@ -96,11 +98,11 @@ const INITIAL_DOCUMENTS: Document[] = [
     }
   },
   { 
-    id: '3', 
+    id: 'D_3', 
     name: 'Escritura Pública - Horizon', 
     category: 'Acquisition', 
     uploadDate: '15/05/2010', 
-    relatedPropertyId: '1',
+    relatedPropertyId: 'I_1',
     summary: 'Escritura definitiva de compra e venda.',
     aiAnalysis: {
         riskLevel: 'Low',
@@ -111,12 +113,12 @@ const INITIAL_DOCUMENTS: Document[] = [
 ];
 
 const INITIAL_EMPLOYEES: Employee[] = [
-  { id: '1', name: 'Carlos Mendes', role: 'Gerente Predial', assignedProperties: ['1', '3'], contact: '(11) 99999-9999', activeTasks: 3, status: 'Active' },
-  { id: '2', name: 'Dra. Ana Silva', role: 'Jurídico', assignedProperties: ['ALL'], contact: '(11) 98888-8888', activeTasks: 5, status: 'Active' },
-  { id: '3', name: 'Roberto Alencar', role: 'Manutenção', assignedProperties: ['2'], contact: '(11) 97777-7777', activeTasks: 1, status: 'On Leave' },
+  { id: 'C_1', name: 'Carlos Mendes', role: 'Gerente Predial', assignedProperties: ['I_1', 'I_3'], contact: '(11) 99999-9999', activeTasks: 3, status: 'Active' },
+  { id: 'C_2', name: 'Dra. Ana Silva', role: 'Jurídico', assignedProperties: ['ALL'], contact: '(11) 98888-8888', activeTasks: 5, status: 'Active' },
+  { id: 'C_3', name: 'Roberto Alencar', role: 'Manutenção', assignedProperties: ['I_2'], contact: '(11) 97777-7777', activeTasks: 1, status: 'On Leave' },
 ];
 
-type ViewState = 'dashboard' | 'assets' | 'documents' | 'registers';
+type ViewState = 'dashboard' | 'assets' | 'documents' | 'registers' | 'audit';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewState>('dashboard');
@@ -128,6 +130,10 @@ const App: React.FC = () => {
   const [cloudAccounts, setCloudAccounts] = useState<CloudAccount[]>([]);
   const [isUpdatingIndices, setIsUpdatingIndices] = useState(false);
   
+  // New States for Logs and Trash
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [trash, setTrash] = useState<TrashItem[]>([]);
+
   // Indices Database - Initialize from LocalStorage
   const [indicesDatabase, setIndicesDatabase] = useState<MonthlyIndexData[]>(() => {
     const saved = localStorage.getItem('indicesDatabase');
@@ -159,111 +165,207 @@ const App: React.FC = () => {
 
   const activeAIConfig = aiConfigs.find(c => c.isActive);
 
-  // Function to handle database updates from AssetManager
+  // --- Helper Functions for Logging and Trash ---
+
+  const addLog = (action: LogEntry['action'], entityType: LogEntry['entityType'], description: string, details?: string) => {
+    const newLog: LogEntry = {
+      id: getNextId('Log'),
+      timestamp: new Date().toLocaleString('pt-BR'),
+      action,
+      entityType,
+      description,
+      user: userProfile.name,
+      details
+    };
+    setLogs(prev => [newLog, ...prev]);
+  };
+
+  const addToTrash = (item: any, type: TrashItem['entityType'], name: string) => {
+    const trashItem: TrashItem = {
+      id: item.id,
+      deletedAt: new Date().toLocaleString('pt-BR'),
+      originalData: item,
+      entityType: type,
+      name: name
+    };
+    setTrash(prev => [trashItem, ...prev]);
+  };
+
+  const handleRestoreFromTrash = (trashId: string) => {
+    const itemToRestore = trash.find(t => t.id === trashId);
+    if (!itemToRestore) return;
+
+    switch (itemToRestore.entityType) {
+      case 'Property':
+        setProperties(prev => [...prev, itemToRestore.originalData]);
+        break;
+      case 'Document':
+        setDocuments(prev => [...prev, itemToRestore.originalData]);
+        break;
+      case 'Owner':
+        setOwners(prev => [...prev, itemToRestore.originalData]);
+        break;
+      case 'Employee':
+        setEmployees(prev => [...prev, itemToRestore.originalData]);
+        break;
+      case 'Tag':
+        setTags(prev => [...prev, itemToRestore.originalData]);
+        break;
+      case 'CloudAccount':
+        setCloudAccounts(prev => [...prev, itemToRestore.originalData]);
+        break;
+    }
+
+    setTrash(prev => prev.filter(t => t.id !== trashId));
+    addLog('Restore', itemToRestore.entityType as any, `Restaurado ${itemToRestore.name} da lixeira.`);
+  };
+
+  // --- CRUD Handlers ---
+
   const handleUpdateIndicesDatabase = (newData: MonthlyIndexData[]) => {
       const mergedMap = new Map<string, MonthlyIndexData>();
-      
-      // 1. Populate with existing data
-      indicesDatabase.forEach(item => {
-        mergedMap.set(item.date, { ...item, indices: { ...item.indices } });
-      });
-
-      // 2. Merge new data
+      indicesDatabase.forEach(item => { mergedMap.set(item.date, { ...item, indices: { ...item.indices } }); });
       newData.forEach(newItem => {
         const existingItem = mergedMap.get(newItem.date);
         if (existingItem) {
-            // Deep merge the indices object
-            mergedMap.set(newItem.date, {
-                date: newItem.date,
-                indices: {
-                    ...existingItem.indices,
-                    ...newItem.indices
-                }
-            });
-        } else {
-            mergedMap.set(newItem.date, newItem);
-        }
+            mergedMap.set(newItem.date, { date: newItem.date, indices: { ...existingItem.indices, ...newItem.indices } });
+        } else { mergedMap.set(newItem.date, newItem); }
       });
-
       const mergedArray = Array.from(mergedMap.values()).sort((a, b) => b.date.localeCompare(a.date));
       setIndicesDatabase(mergedArray);
+      addLog('Update', 'System', 'Base de índices atualizada via API/IA.');
   };
 
   const handleForceUpdateIndices = async () => {
       if(isUpdatingIndices) return;
-      
-      // Removed confirm dialog to ensure button works immediately and avoids blocking
       setIsUpdatingIndices(true);
-
-      // Define range: Last 5 years to present
       const now = new Date();
       const currentMonth = now.getMonth() + 1;
       const currentYear = now.getFullYear();
       const startYear = currentYear - 5;
-      
       const startStr = `${startYear}-01`;
       const endStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
 
       try {
-        // Fetch indices including CDI
-        const newIndices = await fetchHistoricalIndices(
-            startStr,
-            endStr,
-            ['IPCA', 'IGPM', 'INCC', 'SELIC', 'CDI'],
-            activeAIConfig?.apiKey || ''
-        );
-
+        const newIndices = await fetchHistoricalIndices(startStr, endStr, ['IPCA', 'IGPM', 'INCC', 'SELIC', 'CDI'], activeAIConfig?.apiKey || '', activeAIConfig?.modelName || '');
         if(newIndices && newIndices.length > 0) {
             handleUpdateIndicesDatabase(newIndices);
-            // Optional: You could show a toast here instead of alert, but alert confirms completion
-            // alert(`Sucesso! Base de dados atualizada/mesclada com ${newIndices.length} registros mensais do Banco Central.`);
         } else {
-            alert("Não foi possível obter novos dados no momento. Verifique sua conexão ou tente novamente mais tarde.");
+            alert("Não foi possível obter novos dados no momento.");
         }
       } catch (error) {
           console.error(error);
-          alert("Erro ao atualizar índices. Ocorreu uma falha na comunicação.");
+          alert("Erro ao atualizar índices.");
       } finally {
           setIsUpdatingIndices(false);
       }
   };
 
-  // CRUD Settings - Fixed for Batch Updates
-  const handleAddAIConfig = (config: AIConfig) => setAiConfigs(prev => [...prev, config]);
-  const handleDeleteAIConfig = (id: string) => setAiConfigs(prev => prev.filter(c => c.id !== id));
-  const handleSetActiveAIConfig = (id: string) => setAiConfigs(prev => prev.map(c => ({ ...c, isActive: c.id === id })));
-
-  // Cloud Account CRUD - Fixed for Batch Updates
-  const handleAddCloudAccount = (account: CloudAccount) => setCloudAccounts(prev => [...prev, account]);
-  const handleDeleteCloudAccount = (id: string) => setCloudAccounts(prev => prev.filter(c => c.id !== id));
-
-  // Property CRUD - Fixed for Batch Updates
-  const handleAddProperty = (prop: Property) => setProperties(prev => [...prev, prop]);
-  const handleUpdateProperties = (updatedProperties: Property[]) => setProperties(updatedProperties);
-  const handleEditProperty = (prop: Property) => setProperties(prev => prev.map(p => p.id === prop.id ? prop : p));
-  const handleDeleteProperty = (id: string) => setProperties(prev => prev.filter(p => p.id !== id));
-
-  // Tag CRUD - Fixed for Batch Updates
-  const handleAddTag = (tag: PropertyTag) => setTags(prev => [...prev, tag]);
-  const handleDeleteTag = (id: string) => {
-     setTags(prev => prev.filter(t => t.id !== id));
-     setProperties(prev => prev.map(p => ({
-       ...p,
-       tags: p.tags?.filter(tId => tId !== id)
-     })));
+  // CRUD Settings
+  const handleAddAIConfig = (config: AIConfig) => {
+    setAiConfigs(prev => [...prev, config]);
+    addLog('Create', 'System', `Adicionada chave de API: ${config.label}`);
+  };
+  const handleDeleteAIConfig = (id: string) => {
+    setAiConfigs(prev => prev.filter(c => c.id !== id));
+    addLog('Delete', 'System', `Removida chave de API ID: ${id}`);
+  };
+  const handleSetActiveAIConfig = (id: string) => {
+    setAiConfigs(prev => prev.map(c => ({ ...c, isActive: c.id === id })));
+    addLog('Update', 'System', `Chave ativa alterada para ID: ${id}`);
   };
 
-  // Owner CRUD - Fixed for Batch Updates
-  const handleAddOwner = (owner: Owner) => setOwners(prev => [...prev, owner]);
-  const handleEditOwner = (owner: Owner) => setOwners(prev => prev.map(o => o.id === owner.id ? owner : o));
-  const handleDeleteOwner = (id: string) => setOwners(prev => prev.filter(o => o.id !== id));
+  // Cloud Account CRUD
+  const handleAddCloudAccount = (account: CloudAccount) => {
+    setCloudAccounts(prev => [...prev, account]);
+    addLog('Create', 'System', `Adicionada conta nuvem: ${account.provider}`);
+  };
+  const handleDeleteCloudAccount = (id: string) => {
+    const acc = cloudAccounts.find(c => c.id === id);
+    if(acc) {
+        addToTrash(acc, 'CloudAccount', `${acc.provider} - ${acc.accountName}`);
+        setCloudAccounts(prev => prev.filter(c => c.id !== id));
+        addLog('Delete', 'System', `Conta nuvem movida para lixeira: ${acc.provider}`);
+    }
+  };
 
-  // Document CRUD - Fixed for Batch Updates (Crucial fix for multi-upload and reliable delete)
-  const handleAddDocument = (doc: Document) => setDocuments(prev => [doc, ...prev]);
-  // FIX: Using prev state to ensure delete works even if closure is stale
-  const handleDeleteDocument = (id: string) => setDocuments(prev => prev.filter(d => d.id !== id));
+  // Property CRUD
+  const handleAddProperty = (prop: Property) => {
+    setProperties(prev => [...prev, prop]);
+    addLog('Create', 'Property', `Criado imóvel: ${prop.name}`);
+  };
+  const handleUpdateProperties = (updatedProperties: Property[]) => {
+    setProperties(updatedProperties);
+    addLog('Update', 'Property', 'Atualização em lote de imóveis');
+  };
+  const handleEditProperty = (prop: Property) => {
+    setProperties(prev => prev.map(p => p.id === prop.id ? prop : p));
+    addLog('Update', 'Property', `Editado imóvel: ${prop.name}`);
+  };
+  const handleDeleteProperty = (id: string) => {
+    const prop = properties.find(p => p.id === id);
+    if(prop) {
+        addToTrash(prop, 'Property', prop.name);
+        setProperties(prev => prev.filter(p => p.id !== id));
+        addLog('Delete', 'Property', `Imóvel movido para lixeira: ${prop.name}`);
+    }
+  };
+
+  // Tag CRUD
+  const handleAddTag = (tag: PropertyTag) => {
+    setTags(prev => [...prev, tag]);
+    addLog('Create', 'Tag', `Criada etiqueta: ${tag.label}`);
+  };
+  const handleDeleteTag = (id: string) => {
+     const tag = tags.find(t => t.id === id);
+     if(tag) {
+        addToTrash(tag, 'Tag', tag.label);
+        setTags(prev => prev.filter(t => t.id !== id));
+        setProperties(prev => prev.map(p => ({
+            ...p,
+            tags: p.tags?.filter(tId => tId !== id)
+        })));
+        addLog('Delete', 'Tag', `Etiqueta movida para lixeira: ${tag.label}`);
+     }
+  };
+
+  // Owner CRUD
+  const handleAddOwner = (owner: Owner) => {
+    setOwners(prev => [...prev, owner]);
+    addLog('Create', 'Owner', `Cadastrado proprietário: ${owner.name}`);
+  };
+  const handleEditOwner = (owner: Owner) => {
+    setOwners(prev => prev.map(o => o.id === owner.id ? owner : o));
+    addLog('Update', 'Owner', `Editado proprietário: ${owner.name}`);
+  };
+  const handleDeleteOwner = (id: string) => {
+    const owner = owners.find(o => o.id === id);
+    if(owner) {
+        addToTrash(owner, 'Owner', owner.name);
+        setOwners(prev => prev.filter(o => o.id !== id));
+        addLog('Delete', 'Owner', `Proprietário movido para lixeira: ${owner.name}`);
+    }
+  };
+
+  // Document CRUD
+  const handleAddDocument = (doc: Document) => {
+    setDocuments(prev => [doc, ...prev]);
+    addLog('Create', 'Document', `Documento adicionado: ${doc.name}`, `Categoria: ${doc.category}`);
+  };
+  const handleDeleteDocument = (id: string) => {
+    const doc = documents.find(d => d.id === id);
+    if(doc) {
+        addToTrash(doc, 'Document', doc.name);
+        setDocuments(prev => prev.filter(d => d.id !== id));
+        addLog('Delete', 'Document', `Documento movido para lixeira: ${doc.name}`);
+    }
+  };
   
-  const handleAddEmployee = (emp: Employee) => setEmployees(prev => [...prev, emp]);
+  // Employee CRUD
+  const handleAddEmployee = (emp: Employee) => {
+    setEmployees(prev => [...prev, emp]);
+    addLog('Create', 'Employee', `Colaborador adicionado: ${emp.name}`);
+  };
 
   const NavItem = ({ view, icon: Icon, label }: { view: ViewState, icon: any, label: string }) => (
     <button
@@ -294,6 +396,7 @@ const App: React.FC = () => {
           <NavItem view="assets" icon={Building2} label="Imóveis" />
           <NavItem view="documents" icon={FolderOpen} label="Documentos" />
           <NavItem view="registers" icon={Database} label="Cadastros" />
+          <NavItem view="audit" icon={ClipboardList} label="Auditoria e Controle" />
         </nav>
 
         <div className="mt-auto pt-6 border-t border-slate-100 shrink-0">
@@ -384,6 +487,23 @@ const App: React.FC = () => {
               activeAIConfig={activeAIConfig}
               userProfile={userProfile}
               onUpdateProfile={setUserProfile}
+              logs={logs}
+              trash={trash}
+              onRestoreFromTrash={handleRestoreFromTrash}
+            />
+          )}
+
+          {currentView === 'audit' && (
+            <AuditView 
+              logs={logs}
+              trash={trash}
+              onRestoreFromTrash={handleRestoreFromTrash}
+              properties={properties}
+              documents={documents}
+              owners={owners}
+              employees={employees}
+              tags={tags}
+              aiConfig={activeAIConfig}
             />
           )}
         </div>
