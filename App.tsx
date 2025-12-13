@@ -352,6 +352,10 @@ const App: React.FC = () => {
     setDocuments(prev => [doc, ...prev]);
     addLog('Create', 'Document', `Documento adicionado: ${doc.name}`, `Categoria: ${doc.category}`);
   };
+  const handleEditDocument = (doc: Document) => {
+    setDocuments(prev => prev.map(d => d.id === doc.id ? doc : d));
+    addLog('Update', 'Document', `Documento atualizado: ${doc.name}`, `Categoria: ${doc.category}`);
+  };
   const handleDeleteDocument = (id: string) => {
     const doc = documents.find(d => d.id === id);
     if(doc) {
@@ -429,8 +433,9 @@ const App: React.FC = () => {
                onUpdateProperties={handleUpdateProperties}
                onEditProperty={handleEditProperty}
                onDeleteProperty={handleDeleteProperty}
-               allDocuments={documents} 
+               allDocuments={documents}
                onAddDocument={handleAddDocument}
+               onEditDocument={handleEditDocument}
                onDeleteDocument={handleDeleteDocument}
                tags={tags}
                onAddTag={handleAddTag}
@@ -461,8 +466,9 @@ const App: React.FC = () => {
               onUpdateProperties={handleUpdateProperties}
               onEditProperty={handleEditProperty}
               onDeleteProperty={handleDeleteProperty}
-              allDocuments={documents} 
+              allDocuments={documents}
               onAddDocument={handleAddDocument}
+              onEditDocument={handleEditDocument}
               onDeleteDocument={handleDeleteDocument}
               employees={employees}
               onAddEmployee={handleAddEmployee}

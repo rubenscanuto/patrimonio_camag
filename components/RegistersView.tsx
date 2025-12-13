@@ -156,6 +156,7 @@ interface RegistersViewProps {
   onDeleteProperty: (id: string) => void;
   allDocuments: Document[];
   onAddDocument: (doc: Document) => void;
+  onEditDocument: (doc: Document) => void;
   onDeleteDocument: (id: string) => void;
   employees: Employee[];
   onAddEmployee: (emp: Employee) => void;
@@ -209,6 +210,7 @@ const RegistersView: React.FC<RegistersViewProps> = (props) => {
   const [isEditingOwner, setIsEditingOwner] = useState(false);
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [isFetchingCnpj, setIsFetchingCnpj] = useState(false);
+  const [analyzingDocId, setAnalyzingDocId] = useState<string | null>(null);
   
   const [cnaeInput, setCnaeInput] = useState('');
   const [allCnaes, setAllCnaes] = useState<{id: string, descricao: string}[]>([]);
@@ -374,10 +376,22 @@ const RegistersView: React.FC<RegistersViewProps> = (props) => {
       files.forEach(file => {
           const reader = new FileReader();
           reader.onload = (ev) => {
-              newDocs.push({ name: file.name, content: ev.target?.result as string || '', fileObject: file });
+              let content = ev.target?.result as string || '';
+
+              // Special handling for PDF files - add a note that text extraction needs AI
+              if (file.type === 'application/pdf') {
+                  content = `[Arquivo PDF carregado: ${file.name}]\n\nNota: PDFs binários requerem análise com IA para extrair informações.\nClique em "Processar com IA" para analisar este documento.`;
+              }
+
+              newDocs.push({ name: file.name, content: content, fileObject: file });
               if (newDocs.length === files.length) setPendingFiles(prev => [...prev, ...newDocs]);
           };
-          if(file.type.includes('text') || file.type.includes('json')) reader.readAsText(file); else reader.readAsDataURL(file);
+
+          if(file.type.includes('text') || file.type.includes('json')) {
+              reader.readAsText(file);
+          } else {
+              reader.readAsDataURL(file);
+          }
       });
   };
 
@@ -414,6 +428,49 @@ const RegistersView: React.FC<RegistersViewProps> = (props) => {
       }
       setPendingFiles([]);
       setIsAnalyzingDoc(false);
+  };
+
+  const handleAnalyzeDocument = async (doc: Document) => {
+      if (!props.activeAIConfig) {
+          alert("Configure uma chave de API ativa nas Configurações primeiro.");
+          return;
+      }
+
+      if (doc.aiAnalysis) {
+          alert("Este documento já foi analisado.");
+          return;
+      }
+
+      setAnalyzingDocId(doc.id);
+
+      try {
+          const content = doc.contentRaw || doc.summary || '';
+          const analysis = await analyzeDocumentContent(
+              content.substring(0, 10000),
+              props.activeAIConfig.apiKey,
+              'OwnerCreation',
+              props.activeAIConfig.provider,
+              props.activeAIConfig.modelName
+          );
+
+          const updatedDoc: Document = {
+              ...doc,
+              summary: analysis.summary,
+              aiAnalysis: {
+                  riskLevel: analysis.riskLevel,
+                  keyDates: analysis.keyDates,
+                  monetaryValues: analysis.monetaryValues
+              }
+          };
+
+          props.onEditDocument(updatedDoc);
+          alert("Documento analisado com sucesso!");
+      } catch (error) {
+          console.error("Erro ao analisar documento:", error);
+          alert("Erro ao analisar documento. Verifique sua chave de API.");
+      } finally {
+          setAnalyzingDocId(null);
+      }
   };
 
   const handleSaveOwner = (e: React.FormEvent) => {
@@ -478,8 +535,9 @@ const RegistersView: React.FC<RegistersViewProps> = (props) => {
                onUpdateProperties={props.onUpdateProperties}
                onEditProperty={props.onEditProperty}
                onDeleteProperty={(id) => props.onDeleteProperty(id)}
-               allDocuments={props.allDocuments} 
+               allDocuments={props.allDocuments}
                onAddDocument={props.onAddDocument}
+               onEditDocument={props.onEditDocument}
                onDeleteDocument={(id) => props.onDeleteDocument(id)}
                tags={props.tags}
                onAddTag={props.onAddTag}
@@ -953,8 +1011,18 @@ const RegistersView: React.FC<RegistersViewProps> = (props) => {
                                                                 </div>
                                                             </div>
                                                             <div className="flex gap-1 shrink-0">
-                                                                <button onClick={(e) => handleDownload(e, doc)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded"><Download size={16}/></button>
-                                                                <button onClick={(e) => handleDeleteOwnerDoc(e, doc.id, doc.name)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded"><Trash2 size={16}/></button>
+                                                                {!doc.aiAnalysis && (
+                                                                    <button
+                                                                        onClick={(e) => { e.stopPropagation(); handleAnalyzeDocument(doc); }}
+                                                                        disabled={analyzingDocId === doc.id}
+                                                                        className="p-1.5 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded disabled:opacity-50 disabled:cursor-wait"
+                                                                        title="Analisar com IA"
+                                                                    >
+                                                                        {analyzingDocId === doc.id ? <Loader2 size={16} className="animate-spin"/> : <Sparkles size={16}/>}
+                                                                    </button>
+                                                                )}
+                                                                <button onClick={(e) => handleDownload(e, doc)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded" title="Baixar"><Download size={16}/></button>
+                                                                <button onClick={(e) => handleDeleteOwnerDoc(e, doc.id, doc.name)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded" title="Excluir"><Trash2 size={16}/></button>
                                                             </div>
                                                         </div>
                                                     ))
@@ -983,14 +1051,26 @@ const RegistersView: React.FC<RegistersViewProps> = (props) => {
                                 )}
                             </div>
 
-                            <div className="p-6 border-t border-slate-100 bg-white rounded-b-xl flex justify-end gap-3 shrink-0">
-                                <button onClick={() => setShowOwnerModal(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">Cancelar</button>
-                                <button 
-                                    onClick={handleMainSaveButton} 
-                                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-medium shadow-lg shadow-indigo-200 transition-colors flex items-center gap-2"
-                                >
-                                    <Save size={18}/> {getSaveButtonText()}
-                                </button>
+                            <div className="p-6 border-t border-slate-100 bg-white rounded-b-xl flex justify-between items-center gap-3 shrink-0">
+                                <div>
+                                    {ownerModalTab === 'Documents' && (
+                                        <button
+                                            onClick={() => setOwnerModalTab('Data')}
+                                            className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors flex items-center gap-2"
+                                        >
+                                            <ChevronDown size={18} className="rotate-90"/> Voltar aos Dados Cadastrais
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="flex gap-3">
+                                    <button onClick={() => setShowOwnerModal(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">Cancelar</button>
+                                    <button
+                                        onClick={handleMainSaveButton}
+                                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-medium shadow-lg shadow-indigo-200 transition-colors flex items-center gap-2"
+                                    >
+                                        <Save size={18}/> {getSaveButtonText()}
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>

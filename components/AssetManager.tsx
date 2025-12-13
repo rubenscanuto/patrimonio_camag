@@ -12,6 +12,7 @@ interface AssetManagerProps {
   onDeleteProperty: (id: string) => void;
   allDocuments: Document[];
   onAddDocument: (doc: Document) => void;
+  onEditDocument: (doc: Document) => void;
   onDeleteDocument: (id: string) => void;
   tags: PropertyTag[];
   onAddTag: (tag: PropertyTag) => void;

@@ -441,10 +441,12 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   const [newConfigKey, setNewConfigKey] = useState('');
   const [newConfigModel, setNewConfigModel] = useState('gemini-2.5-flash');
   const [isCustomModel, setIsCustomModel] = useState(false);
+  const [customAIProviderName, setCustomAIProviderName] = useState('');
+  const [isCustomProvider, setIsCustomProvider] = useState(false);
 
   // Cloud Form State
   const [newCloudProvider, setNewCloudProvider] = useState<CloudProvider>('Google Drive');
-  const [customProviderName, setCustomProviderName] = useState('');
+  const [customCloudProviderName, setCustomCloudProviderName] = useState('');
   const [newCloudEmail, setNewCloudEmail] = useState('');
   const [cloudCredentials, setCloudCredentials] = useState<Record<string, string>>({});
   const [cloudFormFields, setCloudFormFields] = useState<CloudField[]>(CLOUD_CONFIGS['Google Drive']);
@@ -462,10 +464,14 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   const handleAddKey = (e: React.FormEvent) => {
     e.preventDefault();
     if (newConfigLabel && newConfigKey && newConfigModel) {
+      const finalProvider = isCustomProvider && customAIProviderName
+        ? (customAIProviderName as AIProvider)
+        : newConfigProvider;
+
       onAddAIConfig({
         id: Date.now().toString(),
         label: newConfigLabel,
-        provider: newConfigProvider,
+        provider: finalProvider,
         apiKey: newConfigKey,
         modelName: newConfigModel,
         isActive: aiConfigs.length === 0 // Make active if it's the first one
@@ -473,8 +479,11 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       // Reset form
       setNewConfigLabel('');
       setNewConfigKey('');
-      setNewConfigModel('gemini-2.5-flash');
+      setNewConfigModel('');
       setIsCustomModel(false);
+      setCustomAIProviderName('');
+      setIsCustomProvider(false);
+      setNewConfigProvider('Google Gemini');
     }
   };
 
@@ -487,7 +496,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
         const config = CLOUD_CONFIGS[newCloudProvider];
         if (config) {
             setCloudFormFields(config);
-            setCustomProviderName('');
+            setCustomCloudProviderName('');
         } else {
             setCloudFormFields(CLOUD_CONFIGS['Default']);
         }
@@ -504,7 +513,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       setCloudFormFields(fields);
   };
 
-  const handleCustomProviderBlur = () => { if (customProviderName) detectCustomProviderRequirements(customProviderName); };
+  const handleCustomProviderBlur = () => { if (customCloudProviderName) detectCustomProviderRequirements(customCloudProviderName); };
   const handleCloudCredentialChange = (key: string, value: string) => { setCloudCredentials(prev => ({ ...prev, [key]: value })); };
 
   const handleSaveCloudAccount = (e: React.MouseEvent, connect: boolean) => { 
@@ -512,14 +521,14 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       if(newCloudEmail && onAddCloudAccount && onDeleteCloudAccount) { 
           const accountData: CloudAccount = { 
               id: editingCloudId || getNextId('Cloud'), 
-              provider: newCloudProvider === 'Outras' ? customProviderName : newCloudProvider, 
+              provider: newCloudProvider === 'Outras' ? customCloudProviderName : newCloudProvider, 
               accountName: newCloudEmail.toLowerCase(), 
               credentials: cloudCredentials,
               isConnected: connect, 
               authDate: new Date().toLocaleDateString() 
           };
           if (editingCloudId) { onDeleteCloudAccount(editingCloudId); onAddCloudAccount(accountData); } else { onAddCloudAccount(accountData); }
-          setNewCloudEmail(''); setCloudCredentials({}); setCustomProviderName(''); setNewCloudProvider('Google Drive'); setEditingCloudId(null);
+          setNewCloudEmail(''); setCloudCredentials({}); setCustomCloudProviderName(''); setNewCloudProvider('Google Drive'); setEditingCloudId(null);
       }
   };
 
@@ -530,10 +539,10 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       const standardProviders = ['Google Drive', 'OneDrive', 'Dropbox', 'AWS S3', 'Box', 'iCloud'];
       if (standardProviders.includes(account.provider)) {
           setNewCloudProvider(account.provider as CloudProvider);
-          setCustomProviderName('');
+          setCustomCloudProviderName('');
       } else {
           setNewCloudProvider('Outras');
-          setCustomProviderName(account.provider);
+          setCustomCloudProviderName(account.provider);
       }
   };
 
@@ -546,7 +555,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   const deleteCloudAccount = (id: string) => { 
       if (confirm("Tem certeza que deseja excluir esta conta de nuvem?") && onDeleteCloudAccount) { 
           onDeleteCloudAccount(id); 
-          if (editingCloudId === id) { setNewCloudEmail(''); setCloudCredentials({}); setCustomProviderName(''); setNewCloudProvider('Google Drive'); setEditingCloudId(null); } 
+          if (editingCloudId === id) { setNewCloudEmail(''); setCloudCredentials({}); setCustomCloudProviderName(''); setNewCloudProvider('Google Drive'); setEditingCloudId(null); } 
       } 
   };
   const getEmailSuggestion = () => { if (!newCloudEmail || newCloudEmail.includes('@')) return null; const domain = EMAIL_DOMAINS[newCloudProvider]; if (!domain) return null; return ( <button type="button" onClick={() => setNewCloudEmail((newCloudEmail + domain).toLowerCase())} className="text-xs text-indigo-600 hover:underline mt-1 block text-left"> Completar com {domain} </button> ); };
@@ -561,6 +570,9 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   };
 
   const getModelOptions = () => {
+      if (isCustomProvider) {
+          return [{ value: 'custom', label: 'Digite manualmente o modelo' }];
+      }
       const models = MODEL_CATALOG[newConfigProvider] || [];
       return models.map(m => {
           const costIcon = COST_CONFIG[m.cost].icon;
@@ -645,19 +657,38 @@ const SettingsView: React.FC<SettingsViewProps> = ({
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-bold text-slate-700 mb-1">Provedor LLM</label>
-                            <SearchableSelect 
+                            <SearchableSelect
                                 options={[
                                     { value: 'Google Gemini', label: 'Google Gemini', icon: <GoogleIcon /> },
-                                    { value: 'OpenAI', label: 'OpenAI (Simulado)', icon: <OpenAIIcon /> },
-                                    { value: 'Anthropic', label: 'Anthropic (Simulado)', icon: <AnthropicIcon /> }
+                                    { value: 'OpenAI', label: 'OpenAI', icon: <OpenAIIcon /> },
+                                    { value: 'Anthropic', label: 'Anthropic (Claude)', icon: <AnthropicIcon /> },
+                                    { value: 'Outro', label: 'Outro / Personalizado', icon: <Cpu size={16} /> }
                                 ]}
                                 value={newConfigProvider}
                                 onChange={(val) => {
                                     setNewConfigProvider(val as AIProvider);
                                     setNewConfigModel(''); // Reset model when provider changes
+                                    setIsCustomProvider(val === 'Outro');
+                                    if (val !== 'Outro') setCustomAIProviderName('');
                                 }}
                             />
                         </div>
+
+                        {isCustomProvider && (
+                            <div className="animate-in fade-in slide-in-from-top-2">
+                                <label className="block text-sm font-bold text-slate-700 mb-1">Nome do Provedor</label>
+                                <ClearableInput
+                                    required
+                                    type="text"
+                                    placeholder="Ex: Mistral AI, Cohere, etc."
+                                    className="w-full border border-slate-300 rounded p-2 text-slate-900 focus:border-indigo-500 outline-none"
+                                    value={customAIProviderName}
+                                    onChange={e => setCustomAIProviderName(e.target.value)}
+                                    onClear={() => setCustomAIProviderName('')}
+                                />
+                            </div>
+                        )}
+
                         <div>
                             <label className="block text-sm font-bold text-slate-700 mb-1">Modelo</label>
                             {isCustomModel ? (
@@ -887,9 +918,9 @@ const SettingsView: React.FC<SettingsViewProps> = ({
                                             type="text" 
                                             placeholder="Ex: MinIO, Nextcloud..." 
                                             className="w-full border border-slate-300 rounded p-2 text-slate-900 focus:border-indigo-500 outline-none"
-                                            value={customProviderName} onChange={e => setCustomProviderName(e.target.value)} 
+                                            value={customCloudProviderName} onChange={e => setCustomCloudProviderName(e.target.value)} 
                                             onBlur={handleCustomProviderBlur}
-                                            onClear={() => setCustomProviderName('')}
+                                            onClear={() => setCustomCloudProviderName('')}
                                         />
                                     </div>
                                 ) : (
