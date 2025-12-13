@@ -481,7 +481,7 @@ const AssetManager: React.FC<AssetManagerProps> = ({
     }
 
     setIsLocating(true);
-    const coords = await getCoordinatesFromAddress(constructedAddress, aiConfig.apiKey);
+    const coords = await getCoordinatesFromAddress(constructedAddress, aiConfig.apiKey, aiConfig.provider, aiConfig.modelName);
     
     if (coords) {
       setNewProp(prev => ({
@@ -503,7 +503,7 @@ const AssetManager: React.FC<AssetManagerProps> = ({
     }
 
     setIsGeneratingMapDetail(true);
-    const coords = await getCoordinatesFromAddress(selectedProperty.address, aiConfig.apiKey);
+    const coords = await getCoordinatesFromAddress(selectedProperty.address, aiConfig.apiKey, aiConfig.provider, aiConfig.modelName);
 
     if (coords) {
       const updatedProp = { ...selectedProperty, coordinates: coords };
@@ -592,7 +592,7 @@ const AssetManager: React.FC<AssetManagerProps> = ({
     const combinedText = textFiles.map(f => `--- Arquivo: ${f.name} ---\n${f.content.substring(0, 5000)}`).join('\n\n');
     
     try {
-        const result = await analyzeDocumentContent(combinedText, aiConfig.apiKey, 'PropertyCreation');
+        const result = await analyzeDocumentContent(combinedText, aiConfig.apiKey, 'PropertyCreation', aiConfig.provider, aiConfig.modelName);
         
         // Show summary side-by-side
         if (result.summary) {
@@ -705,7 +705,7 @@ const AssetManager: React.FC<AssetManagerProps> = ({
           const fullText = docs.map(d => d.contentRaw || d.summary || '').join('\n');
           
           if (fullText.length > 10) {
-             const extracted = await extractCustomFieldFromText(fullText, pendingField.key, aiConfig.apiKey);
+             const extracted = await extractCustomFieldFromText(fullText, pendingField.key, aiConfig.apiKey, aiConfig.provider, aiConfig.modelName);
              if (extracted) valueToAdd = extracted;
           }
         }

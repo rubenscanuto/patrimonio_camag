@@ -1,10 +1,5 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
-import { AIAnalysisResult, Property, MonthlyIndexData } from "../types";
-
-// Helper para instanciar o cliente com a chave dinâmica
-const getAIClient = (apiKey: string) => {
-  return new GoogleGenerativeAI(apiKey).getGenerativeModel({ model: "gemini-2.5-flash" });
-};
+import { AIAnalysisResult, Property, MonthlyIndexData, AIProvider, AIConfig } from "../types";
+import { generateText, AIServiceConfig } from "./aiService";
 
 export interface IndexCorrectionResult {
   indexName: string;
@@ -142,12 +137,25 @@ export const fetchHistoricalIndices = async (
     console.warn("BCB Fetch failed", err);
   }
 
-  // 2. Fallback: Google Gemini
+  // 2. Fallback: AI Generation (if API key is provided)
   if (apiKey && indices.length > 0) {
       try {
-        const ai = getAIClient(apiKey);
-        const response = await ai.generateContent(`Return JSON array of monthly percentage rates for ${indices.join(', ')} from ${startDate} to ${endDate}. Format: [{ "date": "YYYY-MM", "indices": { "IPCA": 0.5 } }]. Estimates allowed.`);
-        if (response.response.text()) return JSON.parse(response.response.text());
+        const config: AIServiceConfig = {
+          provider: 'Google Gemini',
+          apiKey: apiKey,
+          modelName: 'gemini-2.5-flash'
+        };
+
+        const prompt = `Return a JSON array of monthly percentage rates for ${indices.join(', ')} from ${startDate} to ${endDate}.
+Format: [{ "date": "YYYY-MM", "indices": { "IPCA": 0.5, "IGPM": 0.8 } }]
+Estimates are allowed if exact data is not available.
+Return ONLY the JSON array, no additional text.`;
+
+        const response = await generateText(config, prompt);
+        const jsonMatch = response.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+          return JSON.parse(jsonMatch[0]);
+        }
       } catch (e) {
         console.error("AI Fetch failed", e);
       }
@@ -204,52 +212,165 @@ export const calculateCorrectionFromLocalData = (
   return results;
 };
 
-// ... (Other functions kept identical but ensuring robust exports)
-export const getCoordinatesFromAddress = async (address: string, apiKey: string): Promise<{lat: number, lng: number} | null> => {
+export const getCoordinatesFromAddress = async (
+  address: string,
+  apiKey: string,
+  provider: AIProvider = 'Google Gemini',
+  modelName: string = 'gemini-2.5-flash'
+): Promise<{lat: number, lng: number} | null> => {
   if (!apiKey || !address) return null;
   try {
-    const ai = getAIClient(apiKey);
-    const response = await ai.generateContent(`Identify lat/lng for: "${address}". Return JSON {lat, lng}.`);
-    return response.response.text() ? JSON.parse(response.response.text()) : null;
-  } catch (e) { return null; }
+    const config: AIServiceConfig = { provider, apiKey, modelName };
+    const prompt = `Identify the latitude and longitude coordinates for the following address: "${address}".
+Return ONLY a valid JSON object in this exact format: {"lat": number, "lng": number}.
+Do not include any explanation or additional text, just the JSON object.`;
+
+    const response = await generateText(config, prompt);
+    const jsonMatch = response.match(/\{[^}]+\}/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]);
+    }
+    return null;
+  } catch (e) {
+    console.error('Error getting coordinates:', e);
+    return null;
+  }
 };
 
-export const extractCustomFieldFromText = async (text: string, fieldName: string, apiKey: string): Promise<string | null> => {
+export const extractCustomFieldFromText = async (
+  text: string,
+  fieldName: string,
+  apiKey: string,
+  provider: AIProvider = 'Google Gemini',
+  modelName: string = 'gemini-2.5-flash'
+): Promise<string | null> => {
   if (!apiKey) return null;
   try {
-    const ai = getAIClient(apiKey);
-    const response = await ai.generateContent(`Find value for "${fieldName}" in text: "${text}". Return JSON {value: string|null}.`);
-    const res = JSON.parse(response.response.text() || "{}");
-    return res.value === "null" ? null : res.value;
-  } catch (e) { return null; }
+    const config: AIServiceConfig = { provider, apiKey, modelName };
+    const prompt = `Extract the value for field "${fieldName}" from the following text: "${text}".
+Return ONLY a valid JSON object in this exact format: {"value": "extracted_value"} or {"value": null} if not found.
+Do not include any explanation or additional text, just the JSON object.`;
+
+    const response = await generateText(config, prompt);
+    const jsonMatch = response.match(/\{[^}]+\}/);
+    if (jsonMatch) {
+      const res = JSON.parse(jsonMatch[0]);
+      return res.value === "null" || res.value === null ? null : res.value;
+    }
+    return null;
+  } catch (e) {
+    console.error('Error extracting field:', e);
+    return null;
+  }
 };
 
-export const analyzeDocumentContent = async (text: string, apiKey: string, type: 'General' | 'PropertyCreation' | 'OwnerCreation' = 'General'): Promise<AIAnalysisResult> => {
+export const analyzeDocumentContent = async (
+  text: string,
+  apiKey: string,
+  type: 'General' | 'PropertyCreation' | 'OwnerCreation' = 'General',
+  provider: AIProvider = 'Google Gemini',
+  modelName: string = 'gemini-2.5-flash'
+): Promise<AIAnalysisResult> => {
   if (!apiKey) throw new Error("API Key required");
-  const ai = getAIClient(apiKey);
 
-  let prompt = `Analyze: ${text}`;
+  const config: AIServiceConfig = { provider, apiKey, modelName };
+
+  let prompt = '';
+  const systemPrompt = 'You are an AI assistant specialized in analyzing legal and financial documents in Brazilian Portuguese.';
 
   if (type === 'OwnerCreation') {
-      prompt = `Extract owner data from: ${text}`;
+    prompt = `Extract owner/proprietor information from the following document text and return a JSON object with this structure:
+{
+  "category": "Personal" or "Legal",
+  "summary": "Brief summary of the document",
+  "riskLevel": "Low" | "Medium" | "High",
+  "keyDates": ["date1", "date2"],
+  "monetaryValues": ["value1", "value2"],
+  "extractedOwnerData": {
+    "name": "Full name",
+    "email": "email@example.com",
+    "phone": "phone number",
+    "document": "CPF or CNPJ",
+    "address": "Full address"
+  }
+}
+
+Document text: ${text}`;
   } else if (type === 'PropertyCreation') {
-      prompt = `Extract property data from: ${text}`;
+    prompt = `Extract property information from the following document text and return a JSON object with this structure:
+{
+  "category": "Acquisition" | "Legal" | "Financial",
+  "summary": "Brief summary of the document",
+  "riskLevel": "Low" | "Medium" | "High",
+  "keyDates": ["date1", "date2"],
+  "monetaryValues": ["value1", "value2"],
+  "extractedPropertyData": {
+    "name": "Property name",
+    "address": "Full address",
+    "value": 0,
+    "purchaseValue": 0,
+    "purchaseDate": "DD/MM/YYYY",
+    "seller": "Seller name"
+  }
+}
+
+Document text: ${text}`;
+  } else {
+    prompt = `Analyze the following document and return a JSON object with this structure:
+{
+  "category": "Legal" | "Financial" | "Maintenance" | "Tax" | "Acquisition" | "Uncategorized",
+  "summary": "Brief summary of the document",
+  "riskLevel": "Low" | "Medium" | "High",
+  "keyDates": ["date1", "date2"],
+  "monetaryValues": ["value1", "value2"]
+}
+
+Document text: ${text}`;
   }
 
   try {
-      const response = await ai.generateContent(prompt);
-      return JSON.parse(response.response.text() || "{}");
+    const response = await generateText(config, prompt, systemPrompt);
+    const jsonMatch = response.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]);
+    }
+    return { category: 'Uncategorized', summary: 'Analysis Failed', riskLevel: 'Low', keyDates: [], monetaryValues: [] };
   } catch (e) {
-      console.error(e);
-      return { category: 'Uncategorized', summary: 'Analysis Failed', riskLevel: 'Low', keyDates: [], monetaryValues: [] };
+    console.error('Error analyzing document:', e);
+    return { category: 'Uncategorized', summary: 'Analysis Failed', riskLevel: 'Low', keyDates: [], monetaryValues: [] };
   }
 };
 
-export const generatePortfolioReport = async (properties: Property[], apiKey: string): Promise<string> => {
-    if (!apiKey) return "<p>API Key required</p>";
-    try {
-        const ai = getAIClient(apiKey);
-        const res = await ai.generateContent(`Summarize portfolio (HTML): ${JSON.stringify(properties.map(p => ({name: p.name, val: p.value, status: p.status})))}`);
-        return res.response.text() || "";
-    } catch(e) { return "<p>Report gen failed</p>"; }
+export const generatePortfolioReport = async (
+  properties: Property[],
+  apiKey: string,
+  provider: AIProvider = 'Google Gemini',
+  modelName: string = 'gemini-2.5-flash'
+): Promise<string> => {
+  if (!apiKey) return "<p>API Key required</p>";
+
+  try {
+    const config: AIServiceConfig = { provider, apiKey, modelName };
+    const propertyData = properties.map(p => ({
+      name: p.name,
+      value: p.value,
+      status: p.status,
+      address: p.address
+    }));
+
+    const prompt = `Generate a comprehensive portfolio report in HTML format for the following real estate properties.
+Include: total value, property breakdown, status analysis, and recommendations.
+Properties: ${JSON.stringify(propertyData)}
+
+Return ONLY valid HTML content (no markdown, no code blocks), starting with <div> and ending with </div>.`;
+
+    const systemPrompt = 'You are a real estate portfolio analyst. Generate professional HTML reports.';
+    const response = await generateText(config, prompt, systemPrompt);
+
+    const htmlMatch = response.match(/<div[\s\S]*<\/div>/i);
+    return htmlMatch ? htmlMatch[0] : response || "<p>Report generation failed</p>";
+  } catch(e) {
+    console.error('Error generating report:', e);
+    return "<p>Report generation failed</p>";
+  }
 };

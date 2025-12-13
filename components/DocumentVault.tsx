@@ -213,7 +213,7 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({ documents, properties, ow
 
         if (process && aiConfig) {
             try {
-                const analysis = await analyzeDocumentContent(doc.content, aiConfig.apiKey);
+                const analysis = await analyzeDocumentContent(doc.content, aiConfig.apiKey, 'General', aiConfig.provider, aiConfig.modelName);
                 aiResult = {
                     category: analysis.category,
                     summary: analysis.summary,

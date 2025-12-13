@@ -398,7 +398,7 @@ const RegistersView: React.FC<RegistersViewProps> = (props) => {
           let extractedOwner: Partial<Owner> | null = null;
           if (processWithAI && props.activeAIConfig) {
               try {
-                  const analysis = await analyzeDocumentContent(file.content.substring(0, 5000), props.activeAIConfig.apiKey, 'OwnerCreation');
+                  const analysis = await analyzeDocumentContent(file.content.substring(0, 5000), props.activeAIConfig.apiKey, 'OwnerCreation', props.activeAIConfig.provider, props.activeAIConfig.modelName);
                   aiResult = { category: analysis.category as any, summary: analysis.summary, riskLevel: analysis.riskLevel as any, keyDates: analysis.keyDates as any, monetaryValues: analysis.monetaryValues as any };
                   if (analysis.extractedOwnerData) extractedOwner = analysis.extractedOwnerData;
                   if (analysis.summary) setAiSummary(analysis.summary);
