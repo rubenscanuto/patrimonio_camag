@@ -110,7 +110,7 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({ options, value, onC
             placeholder={placeholder}
             value={searchTerm}
             onChange={(e) => { setSearchTerm(e.target.value); setIsOpen(true); }}
-            onFocus={() => { setIsOpen(true); setSearchTerm(''); }}
+            onFocus={(e) => { setIsOpen(true); setSearchTerm(''); e.currentTarget.select(); }}
             readOnly={false}
          />
          <div className="absolute right-3 top-1/2 -translate-y-1/2 flex gap-1 items-center pointer-events-none">
