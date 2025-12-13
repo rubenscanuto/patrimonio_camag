@@ -165,6 +165,13 @@ const App: React.FC = () => {
 
   const activeAIConfig = aiConfigs.find(c => c.isActive);
 
+  // Auto-activate first AI config if none is active
+  useEffect(() => {
+    if (aiConfigs.length > 0 && !aiConfigs.some(c => c.isActive)) {
+      setAiConfigs(prev => prev.map((c, idx) => ({ ...c, isActive: idx === 0 })));
+    }
+  }, [aiConfigs.length]);
+
   // --- Helper Functions for Logging and Trash ---
 
   const addLog = (action: LogEntry['action'], entityType: LogEntry['entityType'], description: string, details?: string) => {

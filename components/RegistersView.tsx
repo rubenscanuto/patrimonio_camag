@@ -493,8 +493,8 @@ const RegistersView: React.FC<RegistersViewProps> = (props) => {
     { id: 'Team', label: 'Equipe', icon: Users },
     { id: 'Tags', label: 'Etiquetas', icon: Tag },
     { id: 'Indices', label: 'Base de Índices', icon: Database },
-    { id: 'API', label: 'Chaves de API (IA)', icon: Key },
-    { id: 'Cloud', label: 'Nuvens', icon: Cloud },
+    { id: 'API', label: 'Chaves de API', icon: Key },
+    { id: 'Cloud', label: 'Contas na Nuvem', icon: Cloud },
     { id: 'Users', label: 'Perfil Admin', icon: ShieldCheck },
   ];
   const docCount = getOwnerDocuments().length + pendingFiles.length;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { UserProfile, AIConfig, AIProvider, MonthlyIndexData, CloudAccount, CloudProvider } from '../types';
-import { Save, Key, User, Plus, Trash2, ShieldCheck, Cpu, Database, RefreshCw, Loader2, Eraser, ChevronDown, Cloud, Power, PowerOff, Pencil, ExternalLink, Lock, HelpCircle, HardDrive, Server } from 'lucide-react';
+import { Save, Key, User, Plus, Trash2, ShieldCheck, Cpu, Database, RefreshCw, Loader2, Eraser, ChevronDown, Cloud, Power, PowerOff, Pencil, ExternalLink, Lock, HelpCircle, HardDrive, Server, Eye, EyeOff } from 'lucide-react';
 import { getNextId } from '../services/idService';
 
 interface SettingsViewProps {
@@ -23,8 +23,8 @@ interface SettingsViewProps {
 }
 
 // --- Icons ---
-const GoogleIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+const GoogleIcon = ({ size = 16 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
     <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
     <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.26.81-.58z" fill="#FBBC05"/>
@@ -32,14 +32,14 @@ const GoogleIcon = () => (
   </svg>
 );
 
-const OpenAIIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+const OpenAIIcon = ({ size = 16 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
     <path d="M22.2819 9.82116C22.1838 9.10662 21.8708 8.42398 21.3934 7.86311C20.9161 7.30225 20.3013 6.88448 19.6053 6.66669L19.5398 6.64322L19.507 6.58694C19.1622 5.9224 18.6627 5.34293 18.0475 4.88766C17.4322 4.4324 16.716 4.1135 15.9613 3.95369C15.2066 3.79387 14.4327 3.79796 13.6787 3.96576C12.9247 4.13356 12.2131 4.46366 11.597 4.93175L11.5362 4.98332L11.4518 4.96222C10.7431 4.80993 10.013 4.83339 9.31464 5.03083C8.61633 5.22827 7.96919 5.59392 7.421 6.10025C6.8728 6.60657 6.43851 7.23921 6.15177 7.94977C5.86503 8.66033 5.73373 9.42878 5.7679 10.1969V10.279L5.69759 10.3259C5.03305 10.7135 4.47036 11.2616 4.0772 11.9317C3.68404 12.6019 3.47229 13.3764 3.46191 14.1509C3.46191 15.7552 4.1209 17.2069 5.17615 18.2387L5.34025 18.3934L4.99318 20.3912L6.99327 20.0464L7.14799 20.2105C8.1798 21.2657 9.63152 21.9247 11.2359 21.9247C11.9504 21.8266 12.6331 21.5136 13.1939 21.0362C13.7548 20.5589 14.1726 19.9441 14.3904 19.2481L14.4559 19.2246L14.4887 19.2809C14.8335 19.9454 15.333 20.5249 15.9482 20.9802C16.5635 21.4354 17.2797 21.7543 18.0344 21.9141C18.7891 22.0739 19.563 22.0698 20.317 21.902C21.071 21.7342 21.7826 21.4042 22.3987 20.9361L22.4596 20.8845L22.5439 20.9056C23.2526 21.0579 23.9827 21.0344 24.6811 20.837C25.3794 20.6395 26.0265 20.2739 26.5747 19.7676C27.1229 19.2612 27.5572 18.6286 27.8439 17.918C28.1307 17.2075 28.262 16.439 28.2278 15.6709V15.5888L28.2981 15.5419C28.9627 15.1543 29.5254 14.6062 29.9185 13.9361C30.3117 13.266 30.5234 12.4914 30.5338 11.7169C30.5338 10.1126 29.8748 8.66092 28.8196 7.62912L28.6555 7.47443L29.0025 5.47661L27.0025 5.82138L26.8477 5.6573C25.8159 4.60205 24.3642 3.94306 22.7598 3.94306C22.0453 4.04118 21.3626 4.35418 20.8018 4.83155C20.241 5.30892 19.8231 5.92369 19.6053 6.61975" transform="scale(0.7) translate(1,1)" />
   </svg>
 );
 
-const AnthropicIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+const AnthropicIcon = ({ size = 16 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
     <path d="M18.6667 3L23.3333 13.5H19.5L18.5 11H13.5L12.5 13.5H8.66667L13.3333 3H18.6667ZM16.8 7.5L16 9.3H14.4L13.6 7.5H16.8Z" />
     <path d="M12 21L7.33333 10.5H3.5L8.16667 21H12Z" />
   </svg>
@@ -264,6 +264,54 @@ const ClearableInput = React.forwardRef<HTMLInputElement, ClearableInputProps>((
   );
 });
 ClearableInput.displayName = "ClearableInput";
+
+interface PasswordInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'type'> {
+  onClear: () => void;
+  leftIcon?: React.ReactNode;
+}
+
+const PasswordInput = React.forwardRef<HTMLInputElement, PasswordInputProps>(({ onClear, leftIcon, className = "", ...props }, ref) => {
+  const [showPassword, setShowPassword] = useState(false);
+
+  return (
+    <div className="relative w-full">
+      {leftIcon && (
+        <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+          {leftIcon}
+        </div>
+      )}
+      <input
+        ref={ref}
+        type={showPassword ? 'text' : 'password'}
+        className={`w-full ${className} ${leftIcon ? 'pl-10' : ''} ${props.value ? 'pr-20' : 'pr-10'}`}
+        {...props}
+      />
+      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 items-center">
+        <button
+          type="button"
+          onClick={() => setShowPassword(!showPassword)}
+          className="text-slate-400 hover:text-slate-600 p-1 bg-transparent border-0 cursor-pointer transition-colors"
+          tabIndex={-1}
+          title={showPassword ? 'Ocultar' : 'Exibir'}
+        >
+          {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+        </button>
+        {props.value && !props.readOnly && !props.disabled && (
+          <button
+            type="button"
+            onClick={onClear}
+            className="text-slate-400 hover:text-slate-600 p-1 bg-transparent border-0 cursor-pointer transition-colors"
+            tabIndex={-1}
+            title="Limpar campo"
+          >
+            <Eraser size={14} />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+});
+PasswordInput.displayName = "PasswordInput";
 
 interface SearchableSelectProps {
   options: { value: string; label: string; icon?: React.ReactNode }[];
@@ -589,12 +637,12 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       return selected?.cost;
   };
 
-  const getAIProviderIcon = (provider: string) => {
+  const getAIProviderIcon = (provider: string, size: number = 24) => {
       switch(provider) {
-          case 'Google Gemini': return <GoogleIcon />;
-          case 'OpenAI': return <OpenAIIcon />;
-          case 'Anthropic': return <AnthropicIcon />;
-          default: return <Cpu size={16}/>;
+          case 'Google Gemini': return <GoogleIcon size={size} />;
+          case 'OpenAI': return <OpenAIIcon size={size} />;
+          case 'Anthropic': return <AnthropicIcon size={size} />;
+          default: return <Cpu size={size}/>;
       }
   };
 
@@ -615,7 +663,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
                 onClick={() => setActiveTab('AI')}
                 className={`p-3 rounded-lg text-left flex items-center gap-3 font-medium transition-colors ${activeTab === 'AI' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
             >
-                <Key size={18} /> Chaves de API & IA
+                <Key size={18} /> Chaves de API
             </button>
             <button 
                 onClick={() => setActiveTab('Indices')}
@@ -724,18 +772,15 @@ const SettingsView: React.FC<SettingsViewProps> = ({
 
                     <div>
                         <label className="block text-sm font-bold text-slate-700 mb-1">Chave de API (Secret Key)</label>
-                        <div className="relative">
-                            <Key size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/>
-                            <input required type="password" placeholder="sk-..." 
-                                className="w-full border border-slate-300 rounded p-2 pl-9 pr-10 text-slate-900 focus:border-indigo-500 outline-none font-mono"
-                                value={newConfigKey} onChange={e => setNewConfigKey(e.target.value)}
-                            />
-                            {newConfigKey && (
-                                <button type="button" onClick={() => setNewConfigKey('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1">
-                                    <Eraser size={14}/>
-                                </button>
-                            )}
-                        </div>
+                        <PasswordInput
+                            required
+                            placeholder="sk-..."
+                            className="border border-slate-300 rounded p-2 text-slate-900 focus:border-indigo-500 outline-none font-mono"
+                            value={newConfigKey}
+                            onChange={e => setNewConfigKey(e.target.value)}
+                            onClear={() => setNewConfigKey('')}
+                            leftIcon={<Key size={16} />}
+                        />
                         <p className="text-xs text-slate-500 mt-1">A chave é armazenada localmente no seu navegador.</p>
                     </div>
 
@@ -762,8 +807,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({
                            {aiConfigs.map(config => (
                                <div key={config.id} className={`p-4 flex items-center justify-between ${config.isActive ? 'bg-indigo-50/50' : ''}`}>
                                    <div className="flex items-center gap-4">
-                                       <div className={`w-10 h-10 rounded-full flex items-center justify-center ${config.isActive ? 'bg-green-100 text-green-600' : 'bg-slate-100 text-slate-400'}`}>
-                                           <ShieldCheck size={20} />
+                                       <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-white border border-slate-100 shadow-sm">
+                                           {getAIProviderIcon(config.provider)}
                                        </div>
                                        <div>
                                            <div className="flex items-center gap-2">
@@ -779,14 +824,27 @@ const SettingsView: React.FC<SettingsViewProps> = ({
                                    </div>
                                    <div className="flex items-center gap-2">
                                        {!config.isActive && (
-                                           <button 
+                                           <button
                                              onClick={() => onSetActiveAIConfig(config.id)}
                                              className="text-xs bg-white border border-slate-300 px-3 py-1.5 rounded hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 transition-colors"
                                            >
                                              Definir como Ativa
                                            </button>
                                        )}
-                                       <button 
+                                       <button
+                                         onClick={() => {
+                                           setNewConfigLabel(config.label);
+                                           setNewConfigProvider(config.provider);
+                                           setNewConfigModel(config.modelName);
+                                           setNewConfigKey(config.apiKey);
+                                           onDeleteAIConfig(config.id);
+                                         }}
+                                         className="p-2 text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 rounded transition-colors"
+                                         title="Editar"
+                                       >
+                                           <Pencil size={18}/>
+                                       </button>
+                                       <button
                                          onClick={() => onDeleteAIConfig(config.id)}
                                          className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
                                          title="Excluir"
@@ -949,20 +1007,37 @@ const SettingsView: React.FC<SettingsViewProps> = ({
                                                 <label className="block text-xs font-bold text-slate-700">{field.label}</label>
                                                 <HelpTooltip description={field.description} instructions={field.instructions} />
                                             </div>
-                                            <div className="relative">
-                                                <input 
-                                                    type={field.type || 'text'} 
-                                                    placeholder={field.placeholder} 
-                                                    className="w-full border border-slate-300 rounded p-2 text-sm text-slate-900 focus:border-indigo-500 outline-none font-mono"
-                                                    value={cloudCredentials[field.key] || ''}
-                                                    onChange={e => handleCloudCredentialChange(field.key, e.target.value)}
-                                                />
-                                                {field.consoleUrl && (
-                                                    <a href={field.consoleUrl} target="_blank" rel="noopener noreferrer" className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-indigo-600 p-1" title="Abrir Console do Provedor">
-                                                        <ExternalLink size={14} />
-                                                    </a>
-                                                )}
-                                            </div>
+                                            {field.type === 'password' ? (
+                                                <div className="relative">
+                                                    <PasswordInput
+                                                        placeholder={field.placeholder}
+                                                        className="border border-slate-300 rounded p-2 text-sm text-slate-900 focus:border-indigo-500 outline-none font-mono"
+                                                        value={cloudCredentials[field.key] || ''}
+                                                        onChange={e => handleCloudCredentialChange(field.key, e.target.value)}
+                                                        onClear={() => handleCloudCredentialChange(field.key, '')}
+                                                    />
+                                                    {field.consoleUrl && (
+                                                        <a href={field.consoleUrl} target="_blank" rel="noopener noreferrer" className="absolute right-24 top-1/2 -translate-y-1/2 text-slate-400 hover:text-indigo-600 p-1" title="Abrir Console do Provedor">
+                                                            <ExternalLink size={14} />
+                                                        </a>
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                <div className="relative">
+                                                    <input
+                                                        type="text"
+                                                        placeholder={field.placeholder}
+                                                        className="w-full border border-slate-300 rounded p-2 text-sm text-slate-900 focus:border-indigo-500 outline-none font-mono"
+                                                        value={cloudCredentials[field.key] || ''}
+                                                        onChange={e => handleCloudCredentialChange(field.key, e.target.value)}
+                                                    />
+                                                    {field.consoleUrl && (
+                                                        <a href={field.consoleUrl} target="_blank" rel="noopener noreferrer" className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-indigo-600 p-1" title="Abrir Console do Provedor">
+                                                            <ExternalLink size={14} />
+                                                        </a>
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
                                     ))}
                                 </div>
