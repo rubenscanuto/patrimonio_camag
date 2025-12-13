@@ -401,7 +401,28 @@ INSTRUÇÕES CRÍTICAS PARA O RESUMO - NÃO SE LIMITE A DIZER O TIPO DO DOCUMENT
    - Vencimento e forma de pagamento
    - Base de cálculo e alíquotas
 
-O resumo deve ser um texto corrido, informativo e completo, como se você estivesse descrevendo o documento para alguém que não tem acesso a ele. NÃO use frases genéricas como "Documento referente à identificação pessoal" - seja específico e informativo.
+O resumo deve ser ESTRUTURADO EM TÓPICOS usando o seguinte formato:
+
+📋 TIPO: [Nome específico do tipo de documento]
+
+👤 DADOS PRINCIPAIS:
+• Nome/Razão Social: [valor]
+• Documento (CPF/CNPJ/RG): [valor formatado]
+• [outros dados relevantes]
+
+📍 ENDEREÇO/LOCALIZAÇÃO:
+• [endereço completo se disponível]
+
+💰 INFORMAÇÕES FINANCEIRAS:
+• [valores, custos, impostos, etc.]
+
+📅 DATAS IMPORTANTES:
+• [datas de emissão, validade, vencimentos, etc.]
+
+📝 OBSERVAÇÕES:
+• [cláusulas, condições, informações adicionais relevantes]
+
+Use emojis para facilitar a visualização. Seja específico, detalhado e completo. NÃO use frases genéricas. Preencha apenas as seções relevantes para o tipo de documento.
 
 Texto do documento: ${text}
 

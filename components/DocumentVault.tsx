@@ -926,7 +926,7 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({ documents, properties, ow
                         <textarea
                           value={editedSummary}
                           onChange={(e) => setEditedSummary(e.target.value)}
-                          className="w-full text-sm text-slate-700 bg-white p-4 rounded-lg border border-indigo-300 focus:border-indigo-500 focus:outline-none leading-relaxed min-h-[120px]"
+                          className="w-full text-sm text-slate-700 bg-white p-4 rounded-lg border border-indigo-300 focus:border-indigo-500 focus:outline-none leading-relaxed min-h-[400px]"
                           placeholder="Digite o resumo do documento..."
                         />
                         <div className="flex gap-2">
