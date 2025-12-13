@@ -247,7 +247,7 @@ const App: React.FC = () => {
       const endStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
 
       try {
-        const newIndices = await fetchHistoricalIndices(startStr, endStr, ['IPCA', 'IGPM', 'INCC', 'SELIC', 'CDI'], activeAIConfig?.apiKey || '', activeAIConfig?.modelName || '');
+        const newIndices = await fetchHistoricalIndices(startStr, endStr, ['IPCA', 'IGPM', 'INCC', 'SELIC', 'CDI'], activeAIConfig?.apiKey || '');
         if(newIndices && newIndices.length > 0) {
             handleUpdateIndicesDatabase(newIndices);
         } else {

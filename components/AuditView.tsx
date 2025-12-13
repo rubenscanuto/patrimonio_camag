@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { LogEntry, TrashItem, Property, Document, Owner, Employee, PropertyTag, AIConfig } from '../types';
 import { History, Hash, RotateCcw, Search, Loader2, Trash2, Building2, FileText, User, Tag } from 'lucide-react';
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 interface AuditViewProps {
   logs: LogEntry[];
@@ -51,21 +51,17 @@ const AuditView: React.FC<AuditViewProps> = ({
       if (aiConfig) {
           setIsAiSearching(true);
           try {
-              const ai = new GoogleGenAI({ apiKey: aiConfig.apiKey });
+              const ai = new GoogleGenerativeAI(aiConfig.apiKey).getGenerativeModel({ model: aiConfig.modelName });
               const prompt = `
                   Analise a lista JSON abaixo e encontre itens que semanticamente correspondam à busca: "${searchTerm}".
                   Retorne apenas um array JSON com os IDs dos itens correspondentes.
-                  
+
                   Dados: ${JSON.stringify(data.slice(0, 50))} // Limitando para evitar estouro de tokens
               `;
-              
-              const response = await ai.models.generateContent({
-                  model: aiConfig.modelName,
-                  contents: prompt,
-                  config: { responseMimeType: "application/json" }
-              });
-              
-              const matchedIds = JSON.parse(response.text || "[]");
+
+              const response = await ai.generateContent(prompt);
+
+              const matchedIds = JSON.parse(response.response.text() || "[]");
               const aiFiltered = data.filter(item => matchedIds.includes(item.id));
               setSearchFilteredResults(aiFiltered);
           } catch (e) {
