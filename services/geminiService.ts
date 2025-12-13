@@ -271,73 +271,117 @@ export const analyzeDocumentContent = async (
   provider: AIProvider = 'Google Gemini',
   modelName: string = 'gemini-2.5-flash'
 ): Promise<AIAnalysisResult> => {
-  if (!apiKey) throw new Error("API Key required");
+  if (!apiKey) {
+    console.error("Erro: Chave de API não fornecida");
+    throw new Error("Chave de API necessária para análise");
+  }
+
+  if (!text || text.trim().length === 0) {
+    console.error("Erro: Texto do documento vazio");
+    return {
+      category: 'Uncategorized',
+      summary: 'Documento vazio ou sem conteúdo de texto',
+      riskLevel: 'Low',
+      keyDates: [],
+      monetaryValues: []
+    };
+  }
 
   const config: AIServiceConfig = { provider, apiKey, modelName };
+  console.log(`Iniciando análise com ${provider} (${modelName})...`);
+
+  const textPreview = text.length > 500 ? text.substring(0, 500) + '...' : text;
+  console.log('Preview do texto a ser analisado:', textPreview);
 
   let prompt = '';
-  const systemPrompt = 'You are an AI assistant specialized in analyzing legal and financial documents in Brazilian Portuguese.';
+  const systemPrompt = 'Você é um assistente de IA especializado em analisar documentos jurídicos e financeiros em português brasileiro.';
 
   if (type === 'OwnerCreation') {
-    prompt = `Extract owner/proprietor information from the following document text and return a JSON object with this structure:
+    prompt = `Extraia informações de proprietário/pessoa do seguinte texto de documento e retorne um objeto JSON com esta estrutura:
 {
-  "category": "Personal" or "Legal",
-  "summary": "Brief summary of the document",
+  "category": "Personal" ou "Legal",
+  "summary": "Resumo breve do documento",
   "riskLevel": "Low" | "Medium" | "High",
-  "keyDates": ["date1", "date2"],
-  "monetaryValues": ["value1", "value2"],
+  "keyDates": ["data1", "data2"],
+  "monetaryValues": ["valor1", "valor2"],
   "extractedOwnerData": {
-    "name": "Full name",
-    "email": "email@example.com",
-    "phone": "phone number",
-    "document": "CPF or CNPJ",
-    "address": "Full address"
+    "name": "Nome completo",
+    "email": "email@exemplo.com",
+    "phone": "número de telefone",
+    "document": "CPF ou CNPJ",
+    "address": "Endereço completo"
   }
 }
 
-Document text: ${text}`;
+Texto do documento: ${text}
+
+IMPORTANTE: Retorne APENAS o objeto JSON válido, sem texto adicional antes ou depois.`;
   } else if (type === 'PropertyCreation') {
-    prompt = `Extract property information from the following document text and return a JSON object with this structure:
+    prompt = `Extraia informações de imóvel do seguinte texto de documento e retorne um objeto JSON com esta estrutura:
 {
   "category": "Acquisition" | "Legal" | "Financial",
-  "summary": "Brief summary of the document",
+  "summary": "Resumo breve do documento",
   "riskLevel": "Low" | "Medium" | "High",
-  "keyDates": ["date1", "date2"],
-  "monetaryValues": ["value1", "value2"],
+  "keyDates": ["data1", "data2"],
+  "monetaryValues": ["valor1", "valor2"],
   "extractedPropertyData": {
-    "name": "Property name",
-    "address": "Full address",
+    "name": "Nome do imóvel",
+    "address": "Endereço completo",
     "value": 0,
     "purchaseValue": 0,
     "purchaseDate": "DD/MM/YYYY",
-    "seller": "Seller name"
+    "seller": "Nome do vendedor"
   }
 }
 
-Document text: ${text}`;
+Texto do documento: ${text}
+
+IMPORTANTE: Retorne APENAS o objeto JSON válido, sem texto adicional antes ou depois.`;
   } else {
-    prompt = `Analyze the following document and return a JSON object with this structure:
+    prompt = `Analise o seguinte documento e retorne um objeto JSON com esta estrutura:
 {
-  "category": "Legal" | "Financial" | "Maintenance" | "Tax" | "Acquisition" | "Uncategorized",
-  "summary": "Brief summary of the document",
+  "category": "Legal" | "Financial" | "Maintenance" | "Tax" | "Acquisition" | "Personal" | "Uncategorized",
+  "summary": "Resumo breve e descritivo do documento em português",
   "riskLevel": "Low" | "Medium" | "High",
-  "keyDates": ["date1", "date2"],
-  "monetaryValues": ["value1", "value2"]
+  "keyDates": ["data1", "data2"],
+  "monetaryValues": ["valor1", "valor2"]
 }
 
-Document text: ${text}`;
+Texto do documento: ${text}
+
+IMPORTANTE: Retorne APENAS o objeto JSON válido, sem texto adicional antes ou depois.`;
   }
 
   try {
+    console.log('Enviando requisição para a API de IA...');
     const response = await generateText(config, prompt, systemPrompt);
+    console.log('Resposta recebida da IA:', response.substring(0, 200));
+
     const jsonMatch = response.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]);
+      const parsed = JSON.parse(jsonMatch[0]);
+      console.log('Análise concluída com sucesso:', parsed.category);
+      return parsed;
     }
-    return { category: 'Uncategorized', summary: 'Analysis Failed', riskLevel: 'Low', keyDates: [], monetaryValues: [] };
-  } catch (e) {
-    console.error('Error analyzing document:', e);
-    return { category: 'Uncategorized', summary: 'Analysis Failed', riskLevel: 'Low', keyDates: [], monetaryValues: [] };
+
+    console.warn('Resposta da IA não contém JSON válido');
+    return {
+      category: 'Uncategorized',
+      summary: 'Não foi possível extrair análise estruturada da resposta da IA',
+      riskLevel: 'Low',
+      keyDates: [],
+      monetaryValues: []
+    };
+  } catch (e: any) {
+    console.error('Erro ao analisar documento:', e);
+    console.error('Detalhes do erro:', e.message || e);
+    return {
+      category: 'Uncategorized',
+      summary: `Erro na análise: ${e.message || 'Erro desconhecido'}`,
+      riskLevel: 'Low',
+      keyDates: [],
+      monetaryValues: []
+    };
   }
 };
 

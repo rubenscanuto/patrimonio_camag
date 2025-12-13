@@ -185,7 +185,7 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({ documents, properties, ow
 
   const handleUploadAction = async (process: boolean) => {
     if (pendingDocs.length === 0) return;
-    
+
     if (process && !aiConfig) {
         alert("Configure uma chave de API nas Configurações primeiro para processar com IA.");
         return;
@@ -202,7 +202,7 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({ documents, properties, ow
             monetaryValues: string[];
         } = {
             category: 'Uncategorized',
-            summary: process ? 'Processamento falhou.' : 'Upload manual (sem IA).',
+            summary: process ? 'Aguardando processamento...' : 'Upload manual (sem IA).',
             riskLevel: 'Low',
             keyDates: [],
             monetaryValues: []
@@ -213,7 +213,27 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({ documents, properties, ow
 
         if (process && aiConfig) {
             try {
-                const analysis = await analyzeDocumentContent(doc.content, aiConfig.apiKey, 'General', aiConfig.provider, aiConfig.modelName);
+                console.log(`Processando documento: ${doc.name}`);
+
+                let textToAnalyze = doc.content;
+
+                if (doc.content.startsWith('data:')) {
+                    console.log('Arquivo detectado como binário (PDF/Imagem)');
+                    textToAnalyze = `Arquivo: ${doc.name}\nTipo: ${doc.fileObject.type}\n\nEste é um arquivo binário (PDF ou imagem). Analise com base no nome do arquivo e tipo.`;
+                } else {
+                    console.log(`Texto extraído (${doc.content.length} caracteres)`);
+                }
+
+                const analysis = await analyzeDocumentContent(
+                    textToAnalyze,
+                    aiConfig.apiKey,
+                    'General',
+                    aiConfig.provider,
+                    aiConfig.modelName
+                );
+
+                console.log('Análise recebida:', analysis);
+
                 aiResult = {
                     category: analysis.category,
                     summary: analysis.summary,
@@ -222,19 +242,30 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({ documents, properties, ow
                     monetaryValues: analysis.monetaryValues
                 };
 
-                // Auto-link logic if matching
-                if (!linkedPropId && !linkedOwnerId) {
-                    const text = doc.content.toLowerCase();
-                    // Simple heuristic matching
-                    const matchedProp = properties.find(p => text.includes(p.name.toLowerCase()) || text.includes(p.address.toLowerCase()));
-                    if (matchedProp) linkedPropId = matchedProp.id;
+                if (!linkedPropId && !linkedOwnerId && textToAnalyze.length > 50) {
+                    const text = textToAnalyze.toLowerCase();
+                    const matchedProp = properties.find(p =>
+                        text.includes(p.name.toLowerCase()) ||
+                        text.includes(p.address.toLowerCase())
+                    );
+                    if (matchedProp) {
+                        linkedPropId = matchedProp.id;
+                        console.log('Documento vinculado automaticamente ao imóvel:', matchedProp.name);
+                    }
 
-                    const matchedOwner = owners.find(o => text.includes(o.name.toLowerCase()) || (o.document && text.includes(o.document)));
-                    if (matchedOwner) linkedOwnerId = matchedOwner.id;
+                    const matchedOwner = owners.find(o =>
+                        text.includes(o.name.toLowerCase()) ||
+                        (o.document && text.includes(o.document))
+                    );
+                    if (matchedOwner) {
+                        linkedOwnerId = matchedOwner.id;
+                        console.log('Documento vinculado automaticamente ao proprietário:', matchedOwner.name);
+                    }
                 }
 
-            } catch (e) {
-                console.error("Failed to analyze doc", doc.name, e);
+            } catch (e: any) {
+                console.error("Falha ao analisar documento", doc.name, e);
+                aiResult.summary = `Erro no processamento: ${e.message || 'Verifique a chave de API e tente novamente'}`;
             }
         }
 

@@ -407,36 +407,100 @@ const RegistersView: React.FC<RegistersViewProps> = (props) => {
       if (pendingFiles.length === 0) return;
       setIsAnalyzingDoc(true);
       setAiSummary(null);
+
       for (const file of pendingFiles) {
           let aiResult: any = undefined;
           let extractedOwner: Partial<Owner> | null = null;
+
           if (processWithAI && props.activeAIConfig) {
               try {
-                  const analysis = await analyzeDocumentContent(file.content.substring(0, 5000), props.activeAIConfig.apiKey, 'OwnerCreation', props.activeAIConfig.provider, props.activeAIConfig.modelName);
-                  aiResult = { category: analysis.category as any, summary: analysis.summary, riskLevel: analysis.riskLevel as any, keyDates: analysis.keyDates as any, monetaryValues: analysis.monetaryValues as any };
-                  if (analysis.extractedOwnerData) extractedOwner = analysis.extractedOwnerData;
-                  if (analysis.summary) setAiSummary(analysis.summary);
-              } catch(e) {
-                  console.error(e);
-                  alert("Erro ao analisar documento. Verifique sua chave de API.");
+                  console.log(`Processando documento: ${file.name}`);
+
+                  let textToAnalyze = file.content;
+
+                  if (file.content.startsWith('data:')) {
+                      console.log('Arquivo detectado como binário (PDF/Imagem)');
+                      textToAnalyze = `Arquivo: ${file.name}\nTipo: ${file.name.toLowerCase().endsWith('.pdf') ? 'PDF' : 'Imagem'}\n\nEste é um documento de identificação ou comprovante. Extraia informações de proprietário se possível com base no nome do arquivo.`;
+                  } else if (file.content.length > 5000) {
+                      textToAnalyze = file.content.substring(0, 5000);
+                      console.log(`Texto longo detectado, usando primeiros 5000 caracteres`);
+                  }
+
+                  console.log('Enviando para análise com IA...');
+                  setAiSummary('Analisando documento... Por favor aguarde.');
+
+                  const analysis = await analyzeDocumentContent(
+                      textToAnalyze,
+                      props.activeAIConfig.apiKey,
+                      'OwnerCreation',
+                      props.activeAIConfig.provider,
+                      props.activeAIConfig.modelName
+                  );
+
+                  console.log('Análise recebida:', analysis);
+
+                  aiResult = {
+                      category: analysis.category as any,
+                      summary: analysis.summary,
+                      riskLevel: analysis.riskLevel as any,
+                      keyDates: analysis.keyDates as any,
+                      monetaryValues: analysis.monetaryValues as any
+                  };
+
+                  if (analysis.extractedOwnerData) {
+                      extractedOwner = analysis.extractedOwnerData;
+                      console.log('Dados extraídos do proprietário:', extractedOwner);
+                  }
+
+                  if (analysis.summary) {
+                      setAiSummary(analysis.summary);
+                  } else {
+                      setAiSummary('Análise concluída, mas nenhum resumo foi gerado.');
+                  }
+
+              } catch(e: any) {
+                  console.error('Erro ao analisar documento:', e);
+                  const errorMsg = `Erro na análise: ${e.message || 'Verifique a chave de API e tente novamente'}`;
+                  setAiSummary(errorMsg);
+                  aiResult = {
+                      category: 'Uncategorized',
+                      summary: errorMsg,
+                      riskLevel: 'Low',
+                      keyDates: [],
+                      monetaryValues: []
+                  };
               }
           }
+
           if (ownerModalTab === 'Data' && extractedOwner) {
-              setNewOwner(prev => ({ ...prev, name: prev.name || extractedOwner?.name || prev.name, document: prev.document || extractedOwner?.document || prev.document, email: (prev.email || extractedOwner?.email || prev.email || '').toLowerCase(), phone: formatPhone(prev.phone || extractedOwner?.phone || prev.phone || ''), address: prev.address || extractedOwner?.address || prev.address }));
-              alert("Dados extraídos para o formulário.");
+              setNewOwner(prev => ({
+                  ...prev,
+                  name: prev.name || extractedOwner?.name || prev.name,
+                  document: prev.document || extractedOwner?.document || prev.document,
+                  email: (prev.email || extractedOwner?.email || prev.email || '').toLowerCase(),
+                  phone: formatPhone(prev.phone || extractedOwner?.phone || prev.phone || ''),
+                  address: prev.address || extractedOwner?.address || prev.address
+              }));
+              alert("Dados extraídos e preenchidos no formulário.");
           } else {
               const newDoc: Document = {
                   id: getNextId('Document'),
                   name: file.name,
                   category: aiResult?.category || 'Legal',
                   uploadDate: new Date().toLocaleDateString('pt-BR'),
-                  summary: aiResult?.summary || 'Upload manual.',
+                  summary: aiResult?.summary || 'Upload manual (sem análise de IA).',
                   contentRaw: file.content,
                   aiAnalysis: aiResult
               };
-              if (isEditingOwner && newOwner.id) props.onAddDocument({ ...newDoc, relatedOwnerId: newOwner.id }); else setTempDocs(prev => [...prev, newDoc]);
+
+              if (isEditingOwner && newOwner.id) {
+                  props.onAddDocument({ ...newDoc, relatedOwnerId: newOwner.id });
+              } else {
+                  setTempDocs(prev => [...prev, newDoc]);
+              }
           }
       }
+
       setPendingFiles([]);
       setIsAnalyzingDoc(false);
   };
