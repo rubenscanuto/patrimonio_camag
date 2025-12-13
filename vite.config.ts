@@ -8,6 +8,12 @@ export default defineConfig({
     'process.env': process.env
   },
   optimizeDeps: {
-    include: ['@supabase/supabase-js']
+    include: ['@supabase/supabase-js'],
+    force: true
+  },
+  server: {
+    fs: {
+      strict: false
+    }
   }
 });
