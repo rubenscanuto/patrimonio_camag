@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Document, DocumentCategory, Property, AIConfig, Owner } from '../types';
-import { FileText, Upload, Search, Tag, AlertTriangle, Calendar, DollarSign, Loader2, Filter, User, Building, CheckSquare, Square, Trash2, Eye, X, Download, Save, Sparkles, Eraser, Cloud, ChevronDown, CheckCircle, Link } from 'lucide-react';
+import { FileText, Upload, Search, Tag, AlertTriangle, Calendar, DollarSign, Loader2, Filter, User, Building, CheckSquare, Square, Trash2, Eye, X, Download, Save, Sparkles, Eraser, Cloud, ChevronDown, CheckCircle, Link, ExternalLink } from 'lucide-react';
 import { analyzeDocumentContent } from '../services/geminiService';
 import { getNextId } from '../services/idService';
 
@@ -118,8 +118,11 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({ documents, properties, ow
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<DocumentCategory | 'All'>('All');
   const [viewingDoc, setViewingDoc] = useState<Document | null>(null);
+  const [selectedDocIds, setSelectedDocIds] = useState<Set<string>>(new Set());
+  const [summaryPanelDoc, setSummaryPanelDoc] = useState<Document | null>(null);
+  const [isAnalyzingDoc, setIsAnalyzingDoc] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   const [filterFlags, setFilterFlags] = useState({
     property: true,
     owner: true,
@@ -345,6 +348,133 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({ documents, properties, ow
       setFilterFlags(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
+  const toggleDocSelection = (docId: string) => {
+    setSelectedDocIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(docId)) {
+        newSet.delete(docId);
+      } else {
+        newSet.add(docId);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedDocIds.size === filteredDocs.length) {
+      setSelectedDocIds(new Set());
+    } else {
+      setSelectedDocIds(new Set(filteredDocs.map(d => d.id)));
+    }
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedDocIds.size === 0) return;
+
+    if (confirm(`Tem certeza que deseja excluir ${selectedDocIds.size} documento(s)? Esta ação não pode ser desfeita.`)) {
+      selectedDocIds.forEach(id => {
+        const doc = documents.find(d => d.id === id);
+        if (doc) onDeleteDocument(id);
+      });
+      setSelectedDocIds(new Set());
+      setSummaryPanelDoc(null);
+    }
+  };
+
+  const handleBulkDownload = () => {
+    if (selectedDocIds.size === 0) return;
+
+    selectedDocIds.forEach(id => {
+      const doc = documents.find(d => d.id === id);
+      if (doc) handleDownload(doc);
+    });
+  };
+
+  const handleAnalyzeSingleDoc = async (doc: Document) => {
+    if (!aiConfig) {
+      alert("Configure uma chave de API nas Configurações primeiro.");
+      return;
+    }
+
+    if (doc.aiAnalysis && doc.summary && !doc.summary.includes('Erro')) {
+      alert("Este documento já foi analisado com sucesso.");
+      return;
+    }
+
+    setIsAnalyzingDoc(doc.id);
+
+    try {
+      let textToAnalyze = doc.contentRaw || '';
+
+      if (textToAnalyze.startsWith('data:')) {
+        textToAnalyze = `Arquivo: ${doc.name}\nTipo: ${doc.name.toLowerCase().endsWith('.pdf') ? 'PDF' : 'Imagem'}\n\nAnalise este documento e extraia todas as informações relevantes.`;
+      }
+
+      const analysis = await analyzeDocumentContent(
+        textToAnalyze,
+        aiConfig.apiKey,
+        'General',
+        aiConfig.provider,
+        aiConfig.modelName
+      );
+
+      const updatedDoc: Document = {
+        ...doc,
+        category: analysis.category,
+        summary: analysis.summary,
+        aiAnalysis: {
+          riskLevel: analysis.riskLevel,
+          keyDates: analysis.keyDates,
+          monetaryValues: analysis.monetaryValues
+        }
+      };
+
+      onDeleteDocument(doc.id);
+      onAddDocument(updatedDoc);
+
+      if (summaryPanelDoc?.id === doc.id) {
+        setSummaryPanelDoc(updatedDoc);
+      }
+
+      alert("Documento analisado com sucesso!");
+    } catch (e: any) {
+      alert(`Erro ao analisar: ${e.message}`);
+    } finally {
+      setIsAnalyzingDoc(null);
+    }
+  };
+
+  const handleOpenInBrowser = (doc: Document) => {
+    if (!doc.contentRaw) {
+      alert("O conteúdo deste arquivo não está disponível.");
+      return;
+    }
+
+    try {
+      const blob = doc.contentRaw.startsWith('data:')
+        ? dataURLtoBlob(doc.contentRaw)
+        : new Blob([doc.contentRaw], { type: 'text/plain' });
+
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 100);
+    } catch (e) {
+      alert("Erro ao abrir o documento.");
+    }
+  };
+
+  const dataURLtoBlob = (dataURL: string): Blob => {
+    const arr = dataURL.split(',');
+    const mime = arr[0].match(/:(.*?);/)?.[1] || '';
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new Blob([u8arr], { type: mime });
+  };
+
   return (
     <div className="p-6 h-full flex flex-col" onPaste={handlePaste}>
       <div className="flex justify-between items-center mb-6">
@@ -514,127 +644,282 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({ documents, properties, ow
       </div>
 
       {/* Document List */}
-      <div className="grid grid-cols-1 gap-4 overflow-y-auto pb-6">
-        {filteredDocs.map((doc) => {
-          const relatedProperty = properties.find(p => p.id === doc.relatedPropertyId);
-          const relatedOwner = owners.find(o => o.id === doc.relatedOwnerId);
-          
-          return (
-            <div key={doc.id} className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow relative group">
-              
-              <div className="flex flex-col md:flex-row justify-between items-start gap-4">
-                <div className="flex items-start gap-4 flex-1">
-                  <div className={`p-3 rounded-lg text-slate-600 shrink-0 ${doc.category === 'Tax' ? 'bg-red-50 text-red-600' : 'bg-slate-100'}`}>
-                    <FileText size={24} />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-slate-900 text-lg">{doc.name}</h4>
-                    <p className="text-xs text-slate-400 font-mono mb-1">ID: {doc.id}</p>
-                    <div className="flex flex-wrap items-center gap-3 text-sm text-slate-500 mb-2 mt-1">
-                      <span className="flex items-center gap-1"><Calendar size={12}/> {doc.uploadDate}</span>
-                      
-                      {relatedProperty ? (
-                        <span className="flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-100 text-xs">
-                          <Building size={10} /> Imóvel: {relatedProperty.name}
-                        </span>
-                      ) : relatedOwner ? (
-                        <span className="flex items-center gap-1 bg-green-50 text-green-700 px-2 py-0.5 rounded border border-green-100 text-xs">
-                          <User size={10} /> Proprietário: {relatedOwner.name}
-                        </span>
-                      ) : (
-                        <span className="flex items-center gap-1 bg-slate-100 text-slate-600 px-2 py-0.5 rounded border border-slate-200 text-xs">
-                          <User size={10} /> Geral / Usuário
-                        </span>
-                      )}
-                    </div>
-                    
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                        doc.category === 'Legal' ? 'bg-purple-100 text-purple-700' :
-                        doc.category === 'Financial' ? 'bg-green-100 text-green-700' :
-                        'bg-slate-100 text-slate-700'
-                      }`}>
-                        {doc.category === 'Tax' ? 'Fiscal' : 
-                         doc.category === 'Legal' ? 'Jurídico' :
-                         doc.category === 'Maintenance' ? 'Manutenção' :
-                         doc.category === 'Financial' ? 'Financeiro' :
-                         doc.category === 'Acquisition' ? 'Aquisição' : 
-                         doc.category === 'Personal' ? 'Pessoal' : doc.category}
-                      </span>
-                      
-                      {doc.aiAnalysis?.riskLevel === 'High' && (
-                        <span className="text-xs px-2 py-1 rounded-full bg-red-100 text-red-700 font-medium flex items-center gap-1">
-                          <AlertTriangle size={12} /> Risco Alto
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="flex flex-col-reverse md:flex-row items-end md:items-start gap-4 w-full md:w-auto">
-                    {doc.aiAnalysis && (
-                      <div className="w-full md:w-80 bg-slate-50 rounded-lg p-3 text-xs text-slate-600 border border-slate-100 shadow-sm h-full">
-                         <div className="font-semibold text-indigo-600 mb-1 flex items-center gap-1">
-                           <Tag size={12} /> Resumo IA
-                         </div>
-                         <p className="mb-2 italic line-clamp-3">"{doc.summary}"</p>
-                         
-                         {(doc.aiAnalysis.keyDates.length > 0 || doc.aiAnalysis.monetaryValues.length > 0) && (
-                            <div className="pt-2 border-t border-slate-100 mt-2 space-y-1">
-                                {doc.aiAnalysis.keyDates.length > 0 && (
-                                <div className="flex items-center gap-1 text-slate-500">
-                                    <Calendar size={10} className="text-slate-400" />
-                                    <span>{doc.aiAnalysis.keyDates.join(', ')}</span>
-                                </div>
-                                )}
-                                {doc.aiAnalysis.monetaryValues.length > 0 && (
-                                <div className="flex items-center gap-1 text-slate-500">
-                                    <DollarSign size={10} className="text-slate-400" />
-                                    <span>{doc.aiAnalysis.monetaryValues.join(', ')}</span>
-                                </div>
-                                )}
-                            </div>
-                         )}
-                      </div>
-                    )}
-
-                    <div className="flex items-center gap-1">
-                         <button 
-                            type="button"
-                            onClick={() => setViewingDoc(doc)}
-                            className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
-                            title="Visualizar"
-                         >
-                            <Eye size={18} />
-                         </button>
-                         <button 
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); handleDownload(doc); }}
-                            className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
-                            title="Baixar Documento"
-                         >
-                            <Download size={18} />
-                         </button>
-                         <button 
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); handleDeleteWithConfirm(doc.id, doc.name); }}
-                            className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
-                            title="Excluir Documento"
-                         >
-                            <Trash2 size={18} />
-                         </button>
-                    </div>
-
-                </div>
+      <div className="flex-1 overflow-hidden flex gap-4">
+        <div className="flex-1 flex flex-col">
+          {/* Bulk Actions Bar */}
+          {filteredDocs.length > 0 && (
+            <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={toggleSelectAll}
+                  className="flex items-center gap-2 text-sm font-medium text-slate-700 hover:text-indigo-600 transition-colors"
+                  title={selectedDocIds.size === filteredDocs.length ? "Desmarcar Todos" : "Selecionar Todos"}
+                >
+                  {selectedDocIds.size === filteredDocs.length ? <CheckSquare size={18} /> : <Square size={18} />}
+                  <span>{selectedDocIds.size === filteredDocs.length ? "Desmarcar Todos" : "Selecionar Todos"}</span>
+                </button>
+                {selectedDocIds.size > 0 && (
+                  <span className="text-xs text-slate-500 bg-white px-2 py-1 rounded border border-slate-200">
+                    {selectedDocIds.size} selecionado(s)
+                  </span>
+                )}
               </div>
+              {selectedDocIds.size > 0 && (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleBulkDownload}
+                    className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-indigo-600 bg-white border border-indigo-200 hover:bg-indigo-50 rounded transition-colors"
+                    title="Baixar Selecionados"
+                  >
+                    <Download size={16} /> Baixar ({selectedDocIds.size})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleBulkDelete}
+                    className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-red-600 bg-white border border-red-200 hover:bg-red-50 rounded transition-colors"
+                    title="Excluir Selecionados"
+                  >
+                    <Trash2 size={16} /> Excluir ({selectedDocIds.size})
+                  </button>
+                </div>
+              )}
             </div>
-          );
-        })}
+          )}
 
-        {filteredDocs.length === 0 && (
-          <div className="text-center py-12 text-slate-400">
-            <FileText size={48} className="mx-auto mb-4 opacity-50" />
-            <p>Nenhum documento encontrado com os filtros atuais.</p>
+          <div className="grid grid-cols-1 gap-4 overflow-y-auto pb-6">
+            {filteredDocs.map((doc) => {
+              const relatedProperty = properties.find(p => p.id === doc.relatedPropertyId);
+              const relatedOwner = owners.find(o => o.id === doc.relatedOwnerId);
+              const isSelected = selectedDocIds.has(doc.id);
+
+              return (
+                <div
+                  key={doc.id}
+                  className={`bg-white p-5 rounded-xl border ${isSelected ? 'border-indigo-400 ring-2 ring-indigo-100' : 'border-slate-200'} shadow-sm hover:shadow-md transition-all relative group`}
+                >
+                  <div className="flex items-start gap-4">
+                    {/* Checkbox */}
+                    <button
+                      type="button"
+                      onClick={() => toggleDocSelection(doc.id)}
+                      className="mt-1 shrink-0"
+                    >
+                      {isSelected ? (
+                        <CheckSquare size={20} className="text-indigo-600" />
+                      ) : (
+                        <Square size={20} className="text-slate-300 group-hover:text-slate-400" />
+                      )}
+                    </button>
+
+                    {/* Document Icon */}
+                    <div className={`p-3 rounded-lg text-slate-600 shrink-0 ${doc.category === 'Tax' ? 'bg-red-50 text-red-600' : 'bg-slate-100'}`}>
+                      <FileText size={24} />
+                    </div>
+
+                    {/* Document Info */}
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-semibold text-slate-900 text-lg truncate">{doc.name}</h4>
+                      <p className="text-xs text-slate-400 font-mono mb-1">ID: {doc.id}</p>
+                      <div className="flex flex-wrap items-center gap-3 text-sm text-slate-500 mb-2 mt-1">
+                        <span className="flex items-center gap-1"><Calendar size={12}/> {doc.uploadDate}</span>
+
+                        {relatedProperty ? (
+                          <span className="flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-100 text-xs">
+                            <Building size={10} /> Imóvel: {relatedProperty.name}
+                          </span>
+                        ) : relatedOwner ? (
+                          <span className="flex items-center gap-1 bg-green-50 text-green-700 px-2 py-0.5 rounded border border-green-100 text-xs">
+                            <User size={10} /> Proprietário: {relatedOwner.name}
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1 bg-slate-100 text-slate-600 px-2 py-0.5 rounded border border-slate-200 text-xs">
+                            <User size={10} /> Geral / Usuário
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                          doc.category === 'Legal' ? 'bg-purple-100 text-purple-700' :
+                          doc.category === 'Financial' ? 'bg-green-100 text-green-700' :
+                          'bg-slate-100 text-slate-700'
+                        }`}>
+                          {doc.category === 'Tax' ? 'Fiscal' :
+                           doc.category === 'Legal' ? 'Jurídico' :
+                           doc.category === 'Maintenance' ? 'Manutenção' :
+                           doc.category === 'Financial' ? 'Financeiro' :
+                           doc.category === 'Acquisition' ? 'Aquisição' :
+                           doc.category === 'Personal' ? 'Pessoal' : doc.category}
+                        </span>
+
+                        {doc.aiAnalysis?.riskLevel === 'High' && (
+                          <span className="text-xs px-2 py-1 rounded-full bg-red-100 text-red-700 font-medium flex items-center gap-1">
+                            <AlertTriangle size={12} /> Risco Alto
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenInBrowser(doc)}
+                        className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                        title="Abrir no Navegador"
+                      >
+                        <ExternalLink size={18} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSummaryPanelDoc(doc)}
+                        className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
+                        title="Ver Resumo Inteligente"
+                      >
+                        <Sparkles size={18} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setViewingDoc(doc)}
+                        className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
+                        title="Visualizar Documento"
+                      >
+                        <Eye size={18} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); handleDownload(doc); }}
+                        className="p-2 text-slate-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
+                        title="Baixar Documento"
+                      >
+                        <Download size={18} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); handleDeleteWithConfirm(doc.id, doc.name); }}
+                        className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                        title="Excluir Documento"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
+            {filteredDocs.length === 0 && (
+              <div className="text-center py-12 text-slate-400">
+                <FileText size={48} className="mx-auto mb-4 opacity-50" />
+                <p>Nenhum documento encontrado com os filtros atuais.</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Summary Side Panel */}
+        {summaryPanelDoc && (
+          <div className="w-96 bg-white border-l border-slate-200 flex flex-col animate-in slide-in-from-right duration-200">
+            <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-indigo-50">
+              <div className="flex items-center gap-2 text-indigo-700 font-bold">
+                <Sparkles size={20} />
+                <h4>Resumo Inteligente</h4>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSummaryPanelDoc(null)}
+                className="p-1 hover:bg-indigo-100 rounded transition-colors text-indigo-600"
+                title="Fechar"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="mb-4">
+                <h5 className="font-semibold text-slate-900 mb-1">{summaryPanelDoc.name}</h5>
+                <p className="text-xs text-slate-500">{summaryPanelDoc.uploadDate}</p>
+              </div>
+
+              {summaryPanelDoc.aiAnalysis && summaryPanelDoc.summary && !summaryPanelDoc.summary.includes('Erro') ? (
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-xs font-bold text-slate-500 uppercase mb-2">Resumo</p>
+                    <p className="text-sm text-slate-700 bg-slate-50 p-4 rounded-lg border border-slate-100 leading-relaxed">
+                      {summaryPanelDoc.summary}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-xs font-bold text-slate-500 uppercase mb-2">Nível de Risco</p>
+                    <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold border ${
+                      summaryPanelDoc.aiAnalysis.riskLevel === 'High' ? 'bg-red-50 text-red-700 border-red-200' :
+                      summaryPanelDoc.aiAnalysis.riskLevel === 'Medium' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
+                      'bg-green-50 text-green-700 border-green-200'
+                    }`}>
+                      {summaryPanelDoc.aiAnalysis.riskLevel === 'High' && <AlertTriangle size={12}/>}
+                      {summaryPanelDoc.aiAnalysis.riskLevel === 'High' ? 'Alto Risco' :
+                       summaryPanelDoc.aiAnalysis.riskLevel === 'Medium' ? 'Risco Médio' : 'Risco Baixo'}
+                    </span>
+                  </div>
+
+                  {summaryPanelDoc.aiAnalysis.keyDates.length > 0 && (
+                    <div>
+                      <p className="text-xs font-bold text-slate-500 uppercase mb-2">Datas Importantes</p>
+                      <ul className="space-y-1">
+                        {summaryPanelDoc.aiAnalysis.keyDates.map((date, i) => (
+                          <li key={i} className="flex items-center gap-2 text-sm text-slate-700 bg-slate-50 p-2 rounded">
+                            <Calendar size={14} className="text-slate-400"/> {date}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {summaryPanelDoc.aiAnalysis.monetaryValues.length > 0 && (
+                    <div>
+                      <p className="text-xs font-bold text-slate-500 uppercase mb-2">Valores Encontrados</p>
+                      <ul className="space-y-1">
+                        {summaryPanelDoc.aiAnalysis.monetaryValues.map((val, i) => (
+                          <li key={i} className="flex items-center gap-2 text-sm text-slate-700 bg-slate-50 p-2 rounded">
+                            <DollarSign size={14} className="text-slate-400"/> {val}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <div className="bg-slate-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                    <Sparkles size={32} className="text-slate-400" />
+                  </div>
+                  <p className="text-slate-600 mb-4 text-sm">
+                    Este documento ainda não foi analisado pela IA.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => handleAnalyzeSingleDoc(summaryPanelDoc)}
+                    disabled={isAnalyzingDoc === summaryPanelDoc.id}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 mx-auto transition-colors disabled:opacity-50"
+                  >
+                    {isAnalyzingDoc === summaryPanelDoc.id ? (
+                      <>
+                        <Loader2 className="animate-spin" size={18} />
+                        Analisando...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles size={18} />
+                        Analisar com IA
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>

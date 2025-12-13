@@ -338,14 +338,21 @@ Texto do documento: ${text}
 
 IMPORTANTE: Retorne APENAS o objeto JSON válido, sem texto adicional antes ou depois.`;
   } else {
-    prompt = `Analise o seguinte documento e retorne um objeto JSON com esta estrutura:
+    prompt = `Analise o seguinte documento em detalhes e retorne um objeto JSON com esta estrutura:
 {
   "category": "Legal" | "Financial" | "Maintenance" | "Tax" | "Acquisition" | "Personal" | "Uncategorized",
-  "summary": "Resumo breve e descritivo do documento em português",
+  "summary": "Resumo DETALHADO do documento incluindo: tipo de documento, principais informações (nomes, números de registro, CNPJ/CPF, endereços, valores, datas importantes, finalidade), e quaisquer observações relevantes. Seja específico e informativo.",
   "riskLevel": "Low" | "Medium" | "High",
   "keyDates": ["data1", "data2"],
   "monetaryValues": ["valor1", "valor2"]
 }
+
+INSTRUÇÕES PARA O RESUMO:
+- Se for um CNPJ/CNH/RG/CPF: inclua nome completo, número do documento, data de emissão, órgão emissor, endereço se disponível
+- Se for um contrato: inclua partes envolvidas, objeto do contrato, valores, prazos, condições principais
+- Se for comprovante: inclua finalidade, valor, data, beneficiário
+- Se for nota fiscal: inclua emissor, valor, itens principais, data
+- Sempre extraia e mencione as informações mais relevantes do documento
 
 Texto do documento: ${text}
 
