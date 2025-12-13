@@ -84,15 +84,22 @@ export interface Property {
 
 export type DocumentCategory = 'Legal' | 'Financial' | 'Maintenance' | 'Tax' | 'Acquisition' | 'Uncategorized' | 'Personal';
 
+export interface SummaryEditHistory {
+  timestamp: string;
+  content: string;
+  editedBy: string;
+}
+
 export interface Document {
   id: string;
   name: string;
   category: DocumentCategory;
   uploadDate: string;
   summary?: string;
+  summaryHistory?: SummaryEditHistory[];
   relatedPropertyId?: string; // Chave estrangeira para Property
   relatedOwnerId?: string; // Chave estrangeira para Owner
-  contentRaw?: string; 
+  contentRaw?: string;
   aiAnalysis?: {
     riskLevel: 'Low' | 'Medium' | 'High';
     keyDates: string[];

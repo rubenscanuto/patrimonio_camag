@@ -341,18 +341,67 @@ IMPORTANTE: Retorne APENAS o objeto JSON válido, sem texto adicional antes ou d
     prompt = `Analise o seguinte documento em detalhes e retorne um objeto JSON com esta estrutura:
 {
   "category": "Legal" | "Financial" | "Maintenance" | "Tax" | "Acquisition" | "Personal" | "Uncategorized",
-  "summary": "Resumo DETALHADO do documento incluindo: tipo de documento, principais informações (nomes, números de registro, CNPJ/CPF, endereços, valores, datas importantes, finalidade), e quaisquer observações relevantes. Seja específico e informativo.",
+  "summary": "Resumo EXTREMAMENTE DETALHADO do documento",
   "riskLevel": "Low" | "Medium" | "High",
   "keyDates": ["data1", "data2"],
   "monetaryValues": ["valor1", "valor2"]
 }
 
-INSTRUÇÕES PARA O RESUMO:
-- Se for um CNPJ/CNH/RG/CPF: inclua nome completo, número do documento, data de emissão, órgão emissor, endereço se disponível
-- Se for um contrato: inclua partes envolvidas, objeto do contrato, valores, prazos, condições principais
-- Se for comprovante: inclua finalidade, valor, data, beneficiário
-- Se for nota fiscal: inclua emissor, valor, itens principais, data
-- Sempre extraia e mencione as informações mais relevantes do documento
+INSTRUÇÕES CRÍTICAS PARA O RESUMO - NÃO SE LIMITE A DIZER O TIPO DO DOCUMENTO:
+
+1. DOCUMENTOS DE IDENTIFICAÇÃO (CNPJ, CPF, RG, CNH):
+   - Nome completo da pessoa/empresa
+   - Número do documento com formatação
+   - Data de nascimento/abertura
+   - Data de emissão e validade (se aplicável)
+   - Órgão emissor
+   - Endereço completo
+   - Filiação (para RG)
+   - Para CNPJ: Razão social, nome fantasia, natureza jurídica, capital social, atividades principais
+
+2. CONTRATOS:
+   - Tipo específico do contrato (locação, compra e venda, prestação de serviços, etc.)
+   - Partes contratantes com identificação completa
+   - Objeto detalhado do contrato
+   - Valores mensais e totais
+   - Prazos e datas importantes (início, vencimento, renovação)
+   - Cláusulas principais (multas, reajustes, garantias)
+   - Condições especiais
+
+3. COMPROVANTES:
+   - Finalidade específica do comprovante
+   - Emissor e beneficiário completos
+   - Valor exato
+   - Data da transação
+   - Forma de pagamento
+   - Número do documento/protocolo
+
+4. NOTAS FISCAIS:
+   - Emissor completo (nome, CNPJ, endereço)
+   - Destinatário completo
+   - Número da nota fiscal
+   - Valor total e discriminação de impostos
+   - Itens/serviços detalhados com quantidades e valores unitários
+   - Data de emissão
+   - Chave de acesso
+
+5. ESCRITURAS E REGISTROS:
+   - Tipo do registro (matrícula, escritura, etc.)
+   - Cartório e localização
+   - Número de matrícula/livro/folha
+   - Partes envolvidas
+   - Descrição detalhada do bem
+   - Valores e condições
+   - Ônus e gravames
+
+6. DOCUMENTOS FISCAIS:
+   - Tipo do tributo
+   - Período de referência
+   - Valores discriminados (principal, juros, multa)
+   - Vencimento e forma de pagamento
+   - Base de cálculo e alíquotas
+
+O resumo deve ser um texto corrido, informativo e completo, como se você estivesse descrevendo o documento para alguém que não tem acesso a ele. NÃO use frases genéricas como "Documento referente à identificação pessoal" - seja específico e informativo.
 
 Texto do documento: ${text}
 
