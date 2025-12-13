@@ -707,10 +707,10 @@ const SettingsView: React.FC<SettingsViewProps> = ({
                             <label className="block text-sm font-bold text-slate-700 mb-1">Provedor LLM</label>
                             <SearchableSelect
                                 options={[
-                                    { value: 'Google Gemini', label: 'Google Gemini', icon: <GoogleIcon /> },
-                                    { value: 'OpenAI', label: 'OpenAI', icon: <OpenAIIcon /> },
-                                    { value: 'Anthropic', label: 'Anthropic (Claude)', icon: <AnthropicIcon /> },
-                                    { value: 'Outro', label: 'Outro / Personalizado', icon: <Cpu size={16} /> }
+                                    { value: 'Google Gemini', label: 'Google Gemini', icon: <GoogleIcon size={18} /> },
+                                    { value: 'OpenAI', label: 'OpenAI', icon: <OpenAIIcon size={18} /> },
+                                    { value: 'Anthropic', label: 'Anthropic (Claude)', icon: <AnthropicIcon size={18} /> },
+                                    { value: 'Outro', label: 'Outro / Personalizado', icon: <Cpu size={18} /> }
                                 ]}
                                 value={newConfigProvider}
                                 onChange={(val) => {
@@ -804,7 +804,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
                        </div>
                    ) : (
                        <div className="divide-y divide-slate-100">
-                           {aiConfigs.map(config => (
+                           {[...aiConfigs].sort((a, b) => (b.isActive ? 1 : 0) - (a.isActive ? 1 : 0)).map(config => (
                                <div key={config.id} className={`p-4 flex items-center justify-between ${config.isActive ? 'bg-indigo-50/50' : ''}`}>
                                    <div className="flex items-center gap-4">
                                        <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-white border border-slate-100 shadow-sm">
@@ -816,7 +816,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
                                                {config.isActive && <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">ATIVA</span>}
                                            </div>
                                            <div className="text-sm text-slate-500 flex flex-col md:flex-row md:items-center gap-1 md:gap-4 mt-1">
-                                               <span className="flex items-center gap-1">{getAIProviderIcon(config.provider)} {config.provider}</span>
+                                               <span className="flex items-center gap-1">{getAIProviderIcon(config.provider, 16)} {config.provider}</span>
                                                <span className="flex items-center gap-1"><Cpu size={12}/> {config.modelName}</span>
                                                <span className="font-mono text-xs opacity-70">••••{config.apiKey.slice(-4)}</span>
                                            </div>

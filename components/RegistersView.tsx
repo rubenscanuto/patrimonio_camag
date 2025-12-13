@@ -408,7 +408,7 @@ const RegistersView: React.FC<RegistersViewProps> = (props) => {
       setIsAnalyzingDoc(true);
       setAiSummary(null);
       for (const file of pendingFiles) {
-          let aiResult = { category: 'Legal' as any, summary: processWithAI ? 'Análise indisponível' : 'Upload manual.', riskLevel: 'Low' as any, keyDates: [], monetaryValues: [] };
+          let aiResult: any = undefined;
           let extractedOwner: Partial<Owner> | null = null;
           if (processWithAI && props.activeAIConfig) {
               try {
@@ -416,13 +416,24 @@ const RegistersView: React.FC<RegistersViewProps> = (props) => {
                   aiResult = { category: analysis.category as any, summary: analysis.summary, riskLevel: analysis.riskLevel as any, keyDates: analysis.keyDates as any, monetaryValues: analysis.monetaryValues as any };
                   if (analysis.extractedOwnerData) extractedOwner = analysis.extractedOwnerData;
                   if (analysis.summary) setAiSummary(analysis.summary);
-              } catch(e) { console.error(e); }
+              } catch(e) {
+                  console.error(e);
+                  alert("Erro ao analisar documento. Verifique sua chave de API.");
+              }
           }
           if (ownerModalTab === 'Data' && extractedOwner) {
               setNewOwner(prev => ({ ...prev, name: prev.name || extractedOwner?.name || prev.name, document: prev.document || extractedOwner?.document || prev.document, email: (prev.email || extractedOwner?.email || prev.email || '').toLowerCase(), phone: formatPhone(prev.phone || extractedOwner?.phone || prev.phone || ''), address: prev.address || extractedOwner?.address || prev.address }));
               alert("Dados extraídos para o formulário.");
           } else {
-              const newDoc: Document = { id: getNextId('Document'), name: file.name, category: aiResult.category, uploadDate: new Date().toLocaleDateString('pt-BR'), summary: aiResult.summary, contentRaw: file.content, aiAnalysis: aiResult as any };
+              const newDoc: Document = {
+                  id: getNextId('Document'),
+                  name: file.name,
+                  category: aiResult?.category || 'Legal',
+                  uploadDate: new Date().toLocaleDateString('pt-BR'),
+                  summary: aiResult?.summary || 'Upload manual.',
+                  contentRaw: file.content,
+                  aiAnalysis: aiResult
+              };
               if (isEditingOwner && newOwner.id) props.onAddDocument({ ...newDoc, relatedOwnerId: newOwner.id }); else setTempDocs(prev => [...prev, newDoc]);
           }
       }
