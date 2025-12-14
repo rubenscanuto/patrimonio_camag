@@ -198,6 +198,14 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({ documents, properties, ow
         return;
     }
 
+    const MAX_FILE_SIZE = 10 * 1024 * 1024;
+    for (const doc of pendingDocs) {
+      if (doc.content.length > MAX_FILE_SIZE) {
+        alert(`O arquivo "${doc.name}" é muito grande (>${(doc.content.length / 1024 / 1024).toFixed(1)}MB). Limite: 10MB. Por favor, use um arquivo menor.`);
+        return;
+      }
+    }
+
     setIsAnalyzing(true);
 
     for (const doc of pendingDocs) {
@@ -303,7 +311,15 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({ documents, properties, ow
             monetaryValues: aiResult.monetaryValues
           }
         };
-        onAddDocument(newDoc);
+
+        try {
+          await onAddDocument(newDoc);
+        } catch (uploadError: any) {
+          console.error('Failed to upload document:', doc.name, uploadError);
+          alert(`Falha ao carregar ${doc.name}: ${uploadError.message || 'Erro desconhecido'}`);
+          setIsAnalyzing(false);
+          return;
+        }
     }
 
     setIsAnalyzing(false);

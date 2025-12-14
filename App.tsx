@@ -562,12 +562,16 @@ const App: React.FC = () => {
 
   const handleAddDocument = async (doc: Document) => {
     try {
+      console.log('Saving document:', doc.name, 'Size:', doc.contentRaw?.length || 0);
       await documentsService.create(doc);
       setDocuments(prev => [doc, ...prev]);
       addLog('Create', 'Document', `Documento adicionado: ${doc.name}`, `Categoria: ${doc.category}`);
-    } catch (error) {
+      console.log('Document saved successfully');
+    } catch (error: any) {
       console.error('Error adding document:', error);
-      alert('Erro ao adicionar documento');
+      const errorMessage = error?.message || error?.toString() || 'Erro desconhecido';
+      alert(`Erro ao adicionar documento: ${errorMessage}`);
+      throw error;
     }
   };
   const handleEditDocument = async (doc: Document) => {
