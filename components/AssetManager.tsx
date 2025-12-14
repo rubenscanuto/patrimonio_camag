@@ -3,6 +3,7 @@ import { Property, MaintenanceRecord, Document, PropertyTag, AIConfig, MonthlyIn
 import { Building, MapPin, CheckCircle, XCircle, Wrench, ArrowUpRight, Calendar, User, DollarSign, X, FileText, Upload, Plus, Trash2, Cloud, ScrollText, Camera, Image as ImageIcon, Loader2, Tag, Filter, Pencil, Settings2, Map as MapIcon, Crosshair, Sparkles, TrendingUp, Calculator, Info, List, BarChart3, LineChart as LineChartIcon, AlertTriangle, Eye, Download, Save, Eraser, ChevronDown, Search } from 'lucide-react';
 import { analyzeDocumentContent, extractCustomFieldFromText, getCoordinatesFromAddress, calculateCorrectionFromLocalData, IndexCorrectionResult, fetchHistoricalIndices } from '../services/geminiService';
 import { getNextId } from '../services/idService';
+import DocumentListPanel from './DocumentListPanel';
 
 interface AssetManagerProps {
   properties: Property[];
@@ -179,12 +180,13 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({ options, value, onC
 
 const AssetManager: React.FC<AssetManagerProps> = ({ 
   properties, 
-  onAddProperty, 
-  onUpdateProperties, 
+  onAddProperty,
+  onUpdateProperties,
   onEditProperty,
   onDeleteProperty,
-  allDocuments, 
+  allDocuments,
   onAddDocument,
+  onEditDocument,
   onDeleteDocument,
   tags,
   onAddTag,
@@ -1129,64 +1131,14 @@ const AssetManager: React.FC<AssetManagerProps> = ({
                 
                 {/* DOCS TAB */}
                 {activeTab === 'Docs' && (
-                    <div className="space-y-4">
-                        <div className="flex justify-between items-center mb-2">
-                            <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                                <FileText size={18} className="text-indigo-600"/> Arquivos Vinculados
-                            </h3>
-                        </div>
-                        
-                        {getLinkedDocuments(selectedProperty.id).length === 0 ? (
-                            <div className="text-center py-8 text-slate-400 bg-white rounded-xl border border-dashed border-slate-300">
-                                <p>Nenhum documento vinculado a este imóvel.</p>
-                            </div>
-                        ) : (
-                            <div className="grid grid-cols-1 gap-3">
-                                {getLinkedDocuments(selectedProperty.id).map(doc => (
-                                    <div key={doc.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex justify-between items-center hover:bg-slate-50 transition-colors">
-                                        <div className="flex items-center gap-3 overflow-hidden">
-                                            <div className="bg-indigo-50 p-2.5 rounded-lg text-indigo-600">
-                                                <FileText size={20}/>
-                                            </div>
-                                            <div className="min-w-0">
-                                                <h4 className="font-medium text-slate-800 truncate">{doc.name}</h4>
-                                                <p className="text-xs text-slate-500 flex items-center gap-2">
-                                                    <span className="bg-slate-100 px-1.5 py-0.5 rounded">{doc.category}</span>
-                                                    <span>• {doc.uploadDate}</span>
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <div className="flex gap-2">
-                                            <button 
-                                                type="button"
-                                                onClick={() => setViewingDoc(doc)}
-                                                className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
-                                                title="Visualizar"
-                                            >
-                                                <Eye size={18}/>
-                                            </button>
-                                            <button 
-                                                type="button"
-                                                onClick={(e) => handleDownload(e, doc)}
-                                                className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
-                                                title="Baixar Documento"
-                                            >
-                                                <Download size={18}/>
-                                            </button>
-                                            <button 
-                                                type="button"
-                                                onClick={(e) => confirmDeleteDoc(e, doc.id, doc.name)}
-                                                className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                                                title="Excluir Documento"
-                                            >
-                                                <Trash2 size={18}/>
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
+                    <DocumentListPanel
+                      documents={allDocuments}
+                      relatedPropertyId={selectedProperty.id}
+                      onAddDocument={onAddDocument}
+                      onEditDocument={onEditDocument}
+                      onDeleteDocument={onDeleteDocument}
+                      aiConfig={aiConfig}
+                    />
                 )}
 
                 {/* Other Tabs omitted for brevity in XML, assumed existing */}
