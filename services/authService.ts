@@ -26,12 +26,22 @@ export const authService = {
   },
 
   async signIn(email: string, password: string) {
+    console.log('[authService.signIn] Tentando login com email:', email);
+
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
-    if (error) throw error;
+    if (error) {
+      console.error('[authService.signIn] Erro no login:', error.message, error.status);
+      throw error;
+    }
+
+    console.log('[authService.signIn] Login bem-sucedido');
+    console.log('[authService.signIn] User ID:', data.user?.id);
+    console.log('[authService.signIn] Session:', !!data.session);
+
     return data;
   },
 
@@ -41,8 +51,15 @@ export const authService = {
   },
 
   async getCurrentUser() {
+    console.log('[authService.getCurrentUser] Verificando usuário atual...');
     const { data: { user }, error } = await supabase.auth.getUser();
-    if (error) throw error;
+
+    if (error) {
+      console.error('[authService.getCurrentUser] Erro:', error);
+      throw error;
+    }
+
+    console.log('[authService.getCurrentUser] Usuário:', user?.id || 'null');
     return user;
   },
 
@@ -78,7 +95,13 @@ export const authService = {
   },
 
   onAuthStateChange(callback: (user: any) => void) {
+    console.log('[authService.onAuthStateChange] Registrando listener');
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('[authService.onAuthStateChange] Evento:', event);
+      console.log('[authService.onAuthStateChange] User:', session?.user?.id || 'null');
+      console.log('[authService.onAuthStateChange] Session ativa:', !!session);
+
       (() => {
         callback(session?.user ?? null);
       })();

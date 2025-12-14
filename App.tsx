@@ -191,13 +191,18 @@ const App: React.FC = () => {
 
   const checkAuth = async () => {
     try {
+      console.log('[checkAuth] Verificando autenticação inicial...');
       const currentUser = await authService.getCurrentUser();
-      setUser(currentUser);
+
       if (currentUser) {
+        console.log('[checkAuth] Usuário autenticado encontrado:', currentUser.id);
+        setUser(currentUser);
         await loadUserData(currentUser.id);
+      } else {
+        console.log('[checkAuth] Nenhum usuário autenticado');
       }
     } catch (error) {
-      console.error('Auth check error:', error);
+      console.error('[checkAuth] Erro ao verificar autenticação:', error);
     } finally {
       setLoading(false);
     }
@@ -293,14 +298,29 @@ const App: React.FC = () => {
   };
 
   const handleAuth = async (email: string, password: string, isSignUp: boolean, profile?: { name: string; companyName: string }) => {
-    if (isSignUp && profile) {
-      await authService.signUp(email, password, {
-        name: profile.name,
-        email,
-        companyName: profile.companyName,
-      });
-    } else {
-      await authService.signIn(email, password);
+    try {
+      console.log('[handleAuth] Iniciando autenticação:', isSignUp ? 'SIGN UP' : 'SIGN IN', 'Email:', email);
+
+      if (isSignUp && profile) {
+        console.log('[handleAuth] Criando nova conta...');
+        const result = await authService.signUp(email, password, {
+          name: profile.name,
+          email,
+          companyName: profile.companyName,
+        });
+        console.log('[handleAuth] Conta criada com sucesso:', result.user?.id);
+      } else {
+        console.log('[handleAuth] Fazendo login...');
+        const result = await authService.signIn(email, password);
+        console.log('[handleAuth] Login bem-sucedido:', result.user?.id);
+        console.log('[handleAuth] Sessão ativa:', !!result.session);
+      }
+
+      console.log('[handleAuth] Autenticação concluída');
+    } catch (error: any) {
+      console.error('[handleAuth] Erro na autenticação:', error);
+      console.error('[handleAuth] Detalhes:', error.message, error.status);
+      throw error;
     }
   };
 
