@@ -205,34 +205,75 @@ const App: React.FC = () => {
 
   const loadUserData = async (userId: string) => {
     try {
-      console.log('Loading user data for:', userId);
-      const [
-        profile,
-        propertiesData,
-        documentsData,
-        employeesData,
-        tagsData,
-        ownersData,
-        aiConfigsData,
-        cloudAccountsData,
-        indicesData,
-        logsData,
-        trashData,
-      ] = await Promise.all([
-        authService.getUserProfile(userId),
-        propertiesService.getAll(),
-        documentsService.getAll(),
-        employeesService.getAll(),
-        tagsService.getAll(),
-        ownersService.getAll(),
-        aiConfigsService.getAll(),
-        cloudAccountsService.getAll(),
-        indicesService.getAll(),
-        logsService.getAll(),
-        trashService.getAll(),
-      ]);
+      console.log('[loadUserData] Iniciando carregamento para:', userId);
 
-      console.log('Data loaded successfully');
+      console.log('[loadUserData] Carregando perfil...');
+      const profile = await authService.getUserProfile(userId).catch(e => {
+        console.error('[loadUserData] Erro ao carregar perfil:', e);
+        return null;
+      });
+
+      console.log('[loadUserData] Carregando propriedades...');
+      const propertiesData = await propertiesService.getAll().catch(e => {
+        console.error('[loadUserData] Erro ao carregar propriedades:', e);
+        return [];
+      });
+
+      console.log('[loadUserData] Carregando documentos...');
+      const documentsData = await documentsService.getAll().catch(e => {
+        console.error('[loadUserData] Erro ao carregar documentos:', e);
+        return [];
+      });
+
+      console.log('[loadUserData] Carregando funcionários...');
+      const employeesData = await employeesService.getAll().catch(e => {
+        console.error('[loadUserData] Erro ao carregar funcionários:', e);
+        return [];
+      });
+
+      console.log('[loadUserData] Carregando tags...');
+      const tagsData = await tagsService.getAll().catch(e => {
+        console.error('[loadUserData] Erro ao carregar tags:', e);
+        return [];
+      });
+
+      console.log('[loadUserData] Carregando proprietários...');
+      const ownersData = await ownersService.getAll().catch(e => {
+        console.error('[loadUserData] Erro ao carregar proprietários:', e);
+        return [];
+      });
+
+      console.log('[loadUserData] Carregando configurações de IA...');
+      const aiConfigsData = await aiConfigsService.getAll().catch(e => {
+        console.error('[loadUserData] Erro ao carregar configs de IA:', e);
+        return [];
+      });
+
+      console.log('[loadUserData] Carregando contas cloud...');
+      const cloudAccountsData = await cloudAccountsService.getAll().catch(e => {
+        console.error('[loadUserData] Erro ao carregar contas cloud:', e);
+        return [];
+      });
+
+      console.log('[loadUserData] Carregando índices...');
+      const indicesData = await indicesService.getAll().catch(e => {
+        console.error('[loadUserData] Erro ao carregar índices:', e);
+        return [];
+      });
+
+      console.log('[loadUserData] Carregando logs...');
+      const logsData = await logsService.getAll().catch(e => {
+        console.error('[loadUserData] Erro ao carregar logs:', e);
+        return [];
+      });
+
+      console.log('[loadUserData] Carregando lixeira...');
+      const trashData = await trashService.getAll().catch(e => {
+        console.error('[loadUserData] Erro ao carregar lixeira:', e);
+        return [];
+      });
+
+      console.log('[loadUserData] Todos os dados carregados com sucesso');
       if (profile) setUserProfile(profile);
       setProperties(propertiesData || []);
       setDocuments(documentsData || []);
@@ -244,9 +285,10 @@ const App: React.FC = () => {
       setIndicesDatabase(indicesData || []);
       setLogs(logsData || []);
       setTrash(trashData || []);
-    } catch (error) {
-      console.error('Error loading user data:', error);
-      alert('Erro ao carregar dados do usuário. Verifique sua conexão.');
+    } catch (error: any) {
+      console.error('[loadUserData] Erro crítico:', error);
+      console.error('[loadUserData] Stack:', error.stack);
+      alert(`Erro ao carregar dados: ${error.message || 'Verifique sua conexão.'}`);
     }
   };
 
