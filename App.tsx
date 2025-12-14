@@ -406,12 +406,15 @@ const App: React.FC = () => {
 
   const handleAddAIConfig = async (config: AIConfig) => {
     try {
+      console.log('Saving AI config to database:', config.id, config.label);
       await aiConfigsService.create(config);
+      console.log('AI config saved to database successfully');
       setAiConfigs(prev => [...prev, config]);
-      addLog('Create', 'System', `Adicionada chave de API: ${config.label}`);
-    } catch (error) {
+      await addLog('Create', 'System', `Adicionada chave de API: ${config.label}`);
+    } catch (error: any) {
       console.error('Error adding AI config:', error);
-      alert('Erro ao adicionar configuração de IA');
+      const errorMessage = error?.message || error?.toString() || 'Erro ao salvar configuração de IA';
+      throw new Error(errorMessage);
     }
   };
   const handleDeleteAIConfig = async (id: string) => {

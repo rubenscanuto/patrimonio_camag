@@ -515,22 +515,33 @@ const SettingsView: React.FC<SettingsViewProps> = ({
     alert('Perfil atualizado com sucesso!');
   };
 
-  const handleAddKey = (e: React.FormEvent) => {
+  const handleAddKey = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (newConfigLabel && newConfigKey && newConfigModel) {
+    if (!newConfigLabel || !newConfigKey || !newConfigModel) {
+      alert('Por favor, preencha todos os campos obrigatórios.');
+      return;
+    }
+
+    try {
       const finalProvider = isCustomProvider && customAIProviderName
         ? (customAIProviderName as AIProvider)
         : newConfigProvider;
 
-      onAddAIConfig({
-        id: Date.now().toString(),
+      console.log('Creating AI config:', { label: newConfigLabel, provider: finalProvider, model: newConfigModel });
+
+      const newId = `AI_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+      await onAddAIConfig({
+        id: newId,
         label: newConfigLabel,
         provider: finalProvider,
         apiKey: newConfigKey,
         modelName: newConfigModel,
-        isActive: aiConfigs.length === 0 // Make active if it's the first one
+        isActive: aiConfigs.length === 0
       });
-      // Reset form
+
+      console.log('AI config saved successfully');
+
       setNewConfigLabel('');
       setNewConfigKey('');
       setNewConfigModel('');
@@ -538,6 +549,11 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       setCustomAIProviderName('');
       setIsCustomProvider(false);
       setNewConfigProvider('Google Gemini');
+
+      alert('Chave de API salva com sucesso!');
+    } catch (error: any) {
+      console.error('Error in handleAddKey:', error);
+      alert(`Erro ao salvar chave: ${error.message || 'Erro desconhecido'}`);
     }
   };
 
