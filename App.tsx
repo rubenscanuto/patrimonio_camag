@@ -679,8 +679,8 @@ const App: React.FC = () => {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 h-full overflow-y-auto relative scroll-smooth">
-        <div className="max-w-7xl mx-auto min-h-full">
+      <main className="flex-1 h-full overflow-y-auto relative scroll-smooth flex flex-col">
+        <div className="max-w-7xl mx-auto flex-1 w-full">
           {currentView === 'dashboard' && <Dashboard properties={properties} documents={documents} aiConfig={activeAIConfig} />}
           
           {currentView === 'assets' && (
@@ -770,6 +770,12 @@ const App: React.FC = () => {
             />
           )}
         </div>
+
+        <footer className="border-t border-slate-200 bg-white py-3 px-6 shrink-0">
+          <p className="text-xs text-slate-400 text-center">
+            Patrimônio 360 AI • Versão 1.0.0 • {new Date().getFullYear()}
+          </p>
+        </footer>
       </main>
 
     </div>

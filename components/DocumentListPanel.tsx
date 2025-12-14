@@ -364,12 +364,39 @@ const DocumentListPanel: React.FC<DocumentListPanelProps> = ({
               </button>
             </div>
             <div className="flex-1 overflow-auto p-4 bg-slate-50">
-              {viewingDoc.contentRaw?.startsWith('data:image') ? (
-                <img src={viewingDoc.contentRaw} alt={viewingDoc.name} className="max-w-full h-auto mx-auto" />
-              ) : viewingDoc.contentRaw?.startsWith('data:application/pdf') ? (
-                <iframe src={viewingDoc.contentRaw} className="w-full h-[70vh] border-0 rounded" />
+              {viewingDoc.contentRaw ? (
+                <>
+                  {viewingDoc.contentRaw.startsWith('data:image') && (
+                    <img
+                      src={viewingDoc.contentRaw}
+                      alt={viewingDoc.name}
+                      className="max-w-full h-auto mx-auto rounded shadow-lg"
+                    />
+                  )}
+                  {viewingDoc.contentRaw.startsWith('data:application/pdf') && (
+                    <iframe
+                      src={viewingDoc.contentRaw}
+                      className="w-full h-[70vh] border-0 rounded shadow-lg"
+                      title={viewingDoc.name}
+                    />
+                  )}
+                  {!viewingDoc.contentRaw.startsWith('data:image') &&
+                   !viewingDoc.contentRaw.startsWith('data:application/pdf') && (
+                    <div className="text-center py-12">
+                      <p className="text-slate-500 mb-4">Pré-visualização não disponível para este tipo de arquivo.</p>
+                      <button
+                        type="button"
+                        onClick={(e) => handleDownload(e, viewingDoc)}
+                        className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors inline-flex items-center gap-2"
+                      >
+                        <Download size={16} />
+                        Baixar Documento
+                      </button>
+                    </div>
+                  )}
+                </>
               ) : (
-                <p className="text-slate-500">Visualização não disponível para este tipo de arquivo.</p>
+                <p className="text-slate-500 text-center py-12">Conteúdo do documento não disponível.</p>
               )}
             </div>
           </div>

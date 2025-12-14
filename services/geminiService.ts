@@ -401,28 +401,30 @@ INSTRUÇÕES CRÍTICAS PARA O RESUMO - NÃO SE LIMITE A DIZER O TIPO DO DOCUMENT
    - Vencimento e forma de pagamento
    - Base de cálculo e alíquotas
 
-O resumo deve ser ESTRUTURADO EM TÓPICOS usando o seguinte formato:
+O resumo deve ser EXTREMAMENTE CONCISO e focado APENAS nos dados essenciais. Use o formato:
 
-📋 TIPO: [Nome específico do tipo de documento]
+📋 [Tipo do documento]
 
-👤 DADOS PRINCIPAIS:
-• Nome/Razão Social: [valor]
-• Documento (CPF/CNPJ/RG): [valor formatado]
-• [outros dados relevantes]
+👤 IDENTIFICAÇÃO:
+• [Nome/Razão Social]
+• [CPF/CNPJ] • [RG/IE se disponível]
 
-📍 ENDEREÇO/LOCALIZAÇÃO:
-• [endereço completo se disponível]
+📍 [Endereço completo - apenas se relevante]
 
-💰 INFORMAÇÕES FINANCEIRAS:
-• [valores, custos, impostos, etc.]
+💰 VALORES:
+• [Listar apenas valores numéricos importantes]
 
-📅 DATAS IMPORTANTES:
-• [datas de emissão, validade, vencimentos, etc.]
+📅 [Data de emissão] • [Validade/Vencimento se houver]
 
-📝 OBSERVAÇÕES:
-• [cláusulas, condições, informações adicionais relevantes]
+⚠️ [APENAS alertas críticos - máximo 1 linha]
 
-Use emojis para facilitar a visualização. Seja específico, detalhado e completo. NÃO use frases genéricas. Preencha apenas as seções relevantes para o tipo de documento.
+IMPORTANTE:
+- Seja EXTREMAMENTE direto e objetivo
+- NÃO inclua descrições longas ou explicações
+- APENAS dados concretos (nomes, números, datas)
+- Use bullet points com informações curtas
+- Omita seções vazias ou irrelevantes
+- Máximo 8-10 linhas no total
 
 Texto do documento: ${text}
 
