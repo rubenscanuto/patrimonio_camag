@@ -1,13 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, FolderOpen, Database, Building2, ClipboardList } from 'lucide-react';
+import { LayoutDashboard, FolderOpen, Database, Building2, ClipboardList, Loader2 } from 'lucide-react';
 import Dashboard from './components/Dashboard';
 import DocumentVault from './components/DocumentVault';
 import RegistersView from './components/RegistersView';
 import AssetManager from './components/AssetManager';
 import AuditView from './components/AuditView';
+import AuthScreen from './components/AuthScreen';
 import { Property, Document, Employee, PropertyTag, AIConfig, UserProfile, MonthlyIndexData, Owner, CloudAccount, LogEntry, TrashItem } from './types';
 import { fetchHistoricalIndices } from './services/geminiService';
 import { getNextId } from './services/idService';
+import { authService } from './services/authService';
+import {
+  propertiesService,
+  documentsService,
+  employeesService,
+  tagsService,
+  ownersService,
+  aiConfigsService,
+  cloudAccountsService,
+  indicesService,
+  logsService,
+  trashService,
+} from './services/databaseService';
 
 // Initial Tags
 const INITIAL_TAGS: PropertyTag[] = [
@@ -122,59 +136,136 @@ type ViewState = 'dashboard' | 'assets' | 'documents' | 'registers' | 'audit';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewState>('dashboard');
-  const [properties, setProperties] = useState<Property[]>(INITIAL_PROPERTIES);
-  const [documents, setDocuments] = useState<Document[]>(INITIAL_DOCUMENTS);
-  const [employees, setEmployees] = useState<Employee[]>(INITIAL_EMPLOYEES);
-  const [tags, setTags] = useState<PropertyTag[]>(INITIAL_TAGS);
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [properties, setProperties] = useState<Property[]>([]);
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [tags, setTags] = useState<PropertyTag[]>([]);
   const [owners, setOwners] = useState<Owner[]>([]);
   const [cloudAccounts, setCloudAccounts] = useState<CloudAccount[]>([]);
   const [isUpdatingIndices, setIsUpdatingIndices] = useState(false);
-  
-  // New States for Logs and Trash
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [trash, setTrash] = useState<TrashItem[]>([]);
-
-  // Indices Database - Initialize from LocalStorage
-  const [indicesDatabase, setIndicesDatabase] = useState<MonthlyIndexData[]>(() => {
-    const saved = localStorage.getItem('indicesDatabase');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  // Save to LocalStorage whenever indices change
-  useEffect(() => {
-    localStorage.setItem('indicesDatabase', JSON.stringify(indicesDatabase));
-  }, [indicesDatabase]);
-
-  // User & Settings State
+  const [indicesDatabase, setIndicesDatabase] = useState<MonthlyIndexData[]>([]);
   const [userProfile, setUserProfile] = useState<UserProfile>({
-    name: 'Usuário Admin',
-    email: 'admin@patrimonio360.com',
-    companyName: 'Holding Familiar'
+    name: '',
+    email: '',
+    companyName: ''
   });
-
-  const [aiConfigs, setAiConfigs] = useState<AIConfig[]>([
-    {
-      id: 'default-1',
-      label: 'Gemini Default',
-      provider: 'Google Gemini',
-      apiKey: process.env.API_KEY || '',
-      modelName: 'gemini-2.5-flash',
-      isActive: true
-    }
-  ]);
+  const [aiConfigs, setAiConfigs] = useState<AIConfig[]>([]);
 
   const activeAIConfig = aiConfigs.find(c => c.isActive);
 
-  // Auto-activate first AI config if none is active
   useEffect(() => {
-    if (aiConfigs.length > 0 && !aiConfigs.some(c => c.isActive)) {
-      setAiConfigs(prev => prev.map((c, idx) => ({ ...c, isActive: idx === 0 })));
+    checkAuth();
+
+    const subscription = authService.onAuthStateChange((authUser) => {
+      setUser(authUser);
+      if (authUser) {
+        loadUserData(authUser.id);
+      } else {
+        setLoading(false);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  const checkAuth = async () => {
+    try {
+      const currentUser = await authService.getCurrentUser();
+      setUser(currentUser);
+      if (currentUser) {
+        await loadUserData(currentUser.id);
+      }
+    } catch (error) {
+      console.error('Auth check error:', error);
+    } finally {
+      setLoading(false);
     }
-  }, [aiConfigs.length]);
+  };
+
+  const loadUserData = async (userId: string) => {
+    try {
+      const [
+        profile,
+        propertiesData,
+        documentsData,
+        employeesData,
+        tagsData,
+        ownersData,
+        aiConfigsData,
+        cloudAccountsData,
+        indicesData,
+        logsData,
+        trashData,
+      ] = await Promise.all([
+        authService.getUserProfile(userId),
+        propertiesService.getAll(),
+        documentsService.getAll(),
+        employeesService.getAll(),
+        tagsService.getAll(),
+        ownersService.getAll(),
+        aiConfigsService.getAll(),
+        cloudAccountsService.getAll(),
+        indicesService.getAll(),
+        logsService.getAll(),
+        trashService.getAll(),
+      ]);
+
+      if (profile) setUserProfile(profile);
+      setProperties(propertiesData);
+      setDocuments(documentsData);
+      setEmployees(employeesData);
+      setTags(tagsData);
+      setOwners(ownersData);
+      setAiConfigs(aiConfigsData);
+      setCloudAccounts(cloudAccountsData);
+      setIndicesDatabase(indicesData);
+      setLogs(logsData);
+      setTrash(trashData);
+    } catch (error) {
+      console.error('Error loading user data:', error);
+    }
+  };
+
+  const handleAuth = async (email: string, password: string, isSignUp: boolean, profile?: { name: string; companyName: string }) => {
+    if (isSignUp && profile) {
+      await authService.signUp(email, password, {
+        name: profile.name,
+        email,
+        companyName: profile.companyName,
+      });
+    } else {
+      await authService.signIn(email, password);
+    }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await authService.signOut();
+      setUser(null);
+      setProperties([]);
+      setDocuments([]);
+      setEmployees([]);
+      setTags([]);
+      setOwners([]);
+      setAiConfigs([]);
+      setCloudAccounts([]);
+      setIndicesDatabase([]);
+      setLogs([]);
+      setTrash([]);
+    } catch (error) {
+      console.error('Sign out error:', error);
+    }
+  };
 
   // --- Helper Functions for Logging and Trash ---
 
-  const addLog = (action: LogEntry['action'], entityType: LogEntry['entityType'], description: string, details?: string) => {
+  const addLog = async (action: LogEntry['action'], entityType: LogEntry['entityType'], description: string, details?: string) => {
     const newLog: LogEntry = {
       id: getNextId('Log'),
       timestamp: new Date().toLocaleString('pt-BR'),
@@ -185,9 +276,14 @@ const App: React.FC = () => {
       details
     };
     setLogs(prev => [newLog, ...prev]);
+    try {
+      await logsService.create(newLog);
+    } catch (error) {
+      console.error('Error creating log:', error);
+    }
   };
 
-  const addToTrash = (item: any, type: TrashItem['entityType'], name: string) => {
+  const addToTrash = async (item: any, type: TrashItem['entityType'], name: string) => {
     const trashItem: TrashItem = {
       id: item.id,
       deletedAt: new Date().toLocaleString('pt-BR'),
@@ -196,40 +292,57 @@ const App: React.FC = () => {
       name: name
     };
     setTrash(prev => [trashItem, ...prev]);
+    try {
+      await trashService.create(trashItem);
+    } catch (error) {
+      console.error('Error adding to trash:', error);
+    }
   };
 
-  const handleRestoreFromTrash = (trashId: string) => {
+  const handleRestoreFromTrash = async (trashId: string) => {
     const itemToRestore = trash.find(t => t.id === trashId);
     if (!itemToRestore) return;
 
-    switch (itemToRestore.entityType) {
-      case 'Property':
-        setProperties(prev => [...prev, itemToRestore.originalData]);
-        break;
-      case 'Document':
-        setDocuments(prev => [...prev, itemToRestore.originalData]);
-        break;
-      case 'Owner':
-        setOwners(prev => [...prev, itemToRestore.originalData]);
-        break;
-      case 'Employee':
-        setEmployees(prev => [...prev, itemToRestore.originalData]);
-        break;
-      case 'Tag':
-        setTags(prev => [...prev, itemToRestore.originalData]);
-        break;
-      case 'CloudAccount':
-        setCloudAccounts(prev => [...prev, itemToRestore.originalData]);
-        break;
-    }
+    try {
+      switch (itemToRestore.entityType) {
+        case 'Property':
+          await propertiesService.create(itemToRestore.originalData);
+          setProperties(prev => [...prev, itemToRestore.originalData]);
+          break;
+        case 'Document':
+          await documentsService.create(itemToRestore.originalData);
+          setDocuments(prev => [...prev, itemToRestore.originalData]);
+          break;
+        case 'Owner':
+          await ownersService.create(itemToRestore.originalData);
+          setOwners(prev => [...prev, itemToRestore.originalData]);
+          break;
+        case 'Employee':
+          await employeesService.create(itemToRestore.originalData);
+          setEmployees(prev => [...prev, itemToRestore.originalData]);
+          break;
+        case 'Tag':
+          await tagsService.create(itemToRestore.originalData);
+          setTags(prev => [...prev, itemToRestore.originalData]);
+          break;
+        case 'CloudAccount':
+          await cloudAccountsService.create(itemToRestore.originalData);
+          setCloudAccounts(prev => [...prev, itemToRestore.originalData]);
+          break;
+      }
 
-    setTrash(prev => prev.filter(t => t.id !== trashId));
-    addLog('Restore', itemToRestore.entityType as any, `Restaurado ${itemToRestore.name} da lixeira.`);
+      await trashService.delete(trashId);
+      setTrash(prev => prev.filter(t => t.id !== trashId));
+      addLog('Restore', itemToRestore.entityType as any, `Restaurado ${itemToRestore.name} da lixeira.`);
+    } catch (error) {
+      console.error('Error restoring from trash:', error);
+      alert('Erro ao restaurar item da lixeira');
+    }
   };
 
   // --- CRUD Handlers ---
 
-  const handleUpdateIndicesDatabase = (newData: MonthlyIndexData[]) => {
+  const handleUpdateIndicesDatabase = async (newData: MonthlyIndexData[]) => {
       const mergedMap = new Map<string, MonthlyIndexData>();
       indicesDatabase.forEach(item => { mergedMap.set(item.date, { ...item, indices: { ...item.indices } }); });
       newData.forEach(newItem => {
@@ -240,6 +353,11 @@ const App: React.FC = () => {
       });
       const mergedArray = Array.from(mergedMap.values()).sort((a, b) => b.date.localeCompare(a.date));
       setIndicesDatabase(mergedArray);
+      try {
+        await indicesService.upsert(mergedArray);
+      } catch (error) {
+        console.error('Error updating indices:', error);
+      }
       addLog('Update', 'System', 'Base de índices atualizada via API/IA.');
   };
 
@@ -268,114 +386,224 @@ const App: React.FC = () => {
       }
   };
 
-  // CRUD Settings
-  const handleAddAIConfig = (config: AIConfig) => {
-    setAiConfigs(prev => [...prev, config]);
-    addLog('Create', 'System', `Adicionada chave de API: ${config.label}`);
+  const handleAddAIConfig = async (config: AIConfig) => {
+    try {
+      await aiConfigsService.create(config);
+      setAiConfigs(prev => [...prev, config]);
+      addLog('Create', 'System', `Adicionada chave de API: ${config.label}`);
+    } catch (error) {
+      console.error('Error adding AI config:', error);
+      alert('Erro ao adicionar configuração de IA');
+    }
   };
-  const handleDeleteAIConfig = (id: string) => {
-    setAiConfigs(prev => prev.filter(c => c.id !== id));
-    addLog('Delete', 'System', `Removida chave de API ID: ${id}`);
+  const handleDeleteAIConfig = async (id: string) => {
+    try {
+      await aiConfigsService.delete(id);
+      setAiConfigs(prev => prev.filter(c => c.id !== id));
+      addLog('Delete', 'System', `Removida chave de API ID: ${id}`);
+    } catch (error) {
+      console.error('Error deleting AI config:', error);
+      alert('Erro ao remover configuração de IA');
+    }
   };
-  const handleSetActiveAIConfig = (id: string) => {
-    setAiConfigs(prev => prev.map(c => ({ ...c, isActive: c.id === id })));
-    addLog('Update', 'System', `Chave ativa alterada para ID: ${id}`);
+  const handleSetActiveAIConfig = async (id: string) => {
+    try {
+      const updatedConfigs = aiConfigs.map(c => ({ ...c, isActive: c.id === id }));
+      for (const config of updatedConfigs) {
+        await aiConfigsService.update(config);
+      }
+      setAiConfigs(updatedConfigs);
+      addLog('Update', 'System', `Chave ativa alterada para ID: ${id}`);
+    } catch (error) {
+      console.error('Error setting active AI config:', error);
+      alert('Erro ao definir configuração de IA ativa');
+    }
   };
 
-  // Cloud Account CRUD
-  const handleAddCloudAccount = (account: CloudAccount) => {
-    setCloudAccounts(prev => [...prev, account]);
-    addLog('Create', 'System', `Adicionada conta nuvem: ${account.provider}`);
+  const handleAddCloudAccount = async (account: CloudAccount) => {
+    try {
+      await cloudAccountsService.create(account);
+      setCloudAccounts(prev => [...prev, account]);
+      addLog('Create', 'System', `Adicionada conta nuvem: ${account.provider}`);
+    } catch (error) {
+      console.error('Error adding cloud account:', error);
+      alert('Erro ao adicionar conta de nuvem');
+    }
   };
-  const handleDeleteCloudAccount = (id: string) => {
+  const handleDeleteCloudAccount = async (id: string) => {
     const acc = cloudAccounts.find(c => c.id === id);
     if(acc) {
-        addToTrash(acc, 'CloudAccount', `${acc.provider} - ${acc.accountName}`);
-        setCloudAccounts(prev => prev.filter(c => c.id !== id));
-        addLog('Delete', 'System', `Conta nuvem movida para lixeira: ${acc.provider}`);
+        try {
+          await addToTrash(acc, 'CloudAccount', `${acc.provider} - ${acc.accountName}`);
+          await cloudAccountsService.delete(id);
+          setCloudAccounts(prev => prev.filter(c => c.id !== id));
+          addLog('Delete', 'System', `Conta nuvem movida para lixeira: ${acc.provider}`);
+        } catch (error) {
+          console.error('Error deleting cloud account:', error);
+          alert('Erro ao remover conta de nuvem');
+        }
     }
   };
 
-  // Property CRUD
-  const handleAddProperty = (prop: Property) => {
-    setProperties(prev => [...prev, prop]);
-    addLog('Create', 'Property', `Criado imóvel: ${prop.name}`);
+  const handleAddProperty = async (prop: Property) => {
+    try {
+      await propertiesService.create(prop);
+      setProperties(prev => [...prev, prop]);
+      addLog('Create', 'Property', `Criado imóvel: ${prop.name}`);
+    } catch (error) {
+      console.error('Error adding property:', error);
+      alert('Erro ao adicionar imóvel');
+    }
   };
-  const handleUpdateProperties = (updatedProperties: Property[]) => {
-    setProperties(updatedProperties);
-    addLog('Update', 'Property', 'Atualização em lote de imóveis');
+  const handleUpdateProperties = async (updatedProperties: Property[]) => {
+    try {
+      for (const prop of updatedProperties) {
+        await propertiesService.update(prop);
+      }
+      setProperties(updatedProperties);
+      addLog('Update', 'Property', 'Atualização em lote de imóveis');
+    } catch (error) {
+      console.error('Error updating properties:', error);
+      alert('Erro ao atualizar imóveis');
+    }
   };
-  const handleEditProperty = (prop: Property) => {
-    setProperties(prev => prev.map(p => p.id === prop.id ? prop : p));
-    addLog('Update', 'Property', `Editado imóvel: ${prop.name}`);
+  const handleEditProperty = async (prop: Property) => {
+    try {
+      await propertiesService.update(prop);
+      setProperties(prev => prev.map(p => p.id === prop.id ? prop : p));
+      addLog('Update', 'Property', `Editado imóvel: ${prop.name}`);
+    } catch (error) {
+      console.error('Error editing property:', error);
+      alert('Erro ao editar imóvel');
+    }
   };
-  const handleDeleteProperty = (id: string) => {
+  const handleDeleteProperty = async (id: string) => {
     const prop = properties.find(p => p.id === id);
     if(prop) {
-        addToTrash(prop, 'Property', prop.name);
-        setProperties(prev => prev.filter(p => p.id !== id));
-        addLog('Delete', 'Property', `Imóvel movido para lixeira: ${prop.name}`);
+        try {
+          await addToTrash(prop, 'Property', prop.name);
+          await propertiesService.delete(id);
+          setProperties(prev => prev.filter(p => p.id !== id));
+          addLog('Delete', 'Property', `Imóvel movido para lixeira: ${prop.name}`);
+        } catch (error) {
+          console.error('Error deleting property:', error);
+          alert('Erro ao remover imóvel');
+        }
     }
   };
 
-  // Tag CRUD
-  const handleAddTag = (tag: PropertyTag) => {
-    setTags(prev => [...prev, tag]);
-    addLog('Create', 'Tag', `Criada etiqueta: ${tag.label}`);
+  const handleAddTag = async (tag: PropertyTag) => {
+    try {
+      await tagsService.create(tag);
+      setTags(prev => [...prev, tag]);
+      addLog('Create', 'Tag', `Criada etiqueta: ${tag.label}`);
+    } catch (error) {
+      console.error('Error adding tag:', error);
+      alert('Erro ao adicionar etiqueta');
+    }
   };
-  const handleDeleteTag = (id: string) => {
+  const handleDeleteTag = async (id: string) => {
      const tag = tags.find(t => t.id === id);
      if(tag) {
-        addToTrash(tag, 'Tag', tag.label);
-        setTags(prev => prev.filter(t => t.id !== id));
-        setProperties(prev => prev.map(p => ({
-            ...p,
-            tags: p.tags?.filter(tId => tId !== id)
-        })));
-        addLog('Delete', 'Tag', `Etiqueta movida para lixeira: ${tag.label}`);
+        try {
+          await addToTrash(tag, 'Tag', tag.label);
+          await tagsService.delete(id);
+          setTags(prev => prev.filter(t => t.id !== id));
+          const updatedProperties = properties.map(p => ({
+              ...p,
+              tags: p.tags?.filter(tId => tId !== id)
+          }));
+          setProperties(updatedProperties);
+          for (const prop of updatedProperties) {
+            await propertiesService.update(prop);
+          }
+          addLog('Delete', 'Tag', `Etiqueta movida para lixeira: ${tag.label}`);
+        } catch (error) {
+          console.error('Error deleting tag:', error);
+          alert('Erro ao remover etiqueta');
+        }
      }
   };
 
-  // Owner CRUD
-  const handleAddOwner = (owner: Owner) => {
-    setOwners(prev => [...prev, owner]);
-    addLog('Create', 'Owner', `Cadastrado proprietário: ${owner.name}`);
+  const handleAddOwner = async (owner: Owner) => {
+    try {
+      await ownersService.create(owner);
+      setOwners(prev => [...prev, owner]);
+      addLog('Create', 'Owner', `Cadastrado proprietário: ${owner.name}`);
+    } catch (error) {
+      console.error('Error adding owner:', error);
+      alert('Erro ao adicionar proprietário');
+    }
   };
-  const handleEditOwner = (owner: Owner) => {
-    setOwners(prev => prev.map(o => o.id === owner.id ? owner : o));
-    addLog('Update', 'Owner', `Editado proprietário: ${owner.name}`);
+  const handleEditOwner = async (owner: Owner) => {
+    try {
+      await ownersService.update(owner);
+      setOwners(prev => prev.map(o => o.id === owner.id ? owner : o));
+      addLog('Update', 'Owner', `Editado proprietário: ${owner.name}`);
+    } catch (error) {
+      console.error('Error editing owner:', error);
+      alert('Erro ao editar proprietário');
+    }
   };
-  const handleDeleteOwner = (id: string) => {
+  const handleDeleteOwner = async (id: string) => {
     const owner = owners.find(o => o.id === id);
     if(owner) {
-        addToTrash(owner, 'Owner', owner.name);
-        setOwners(prev => prev.filter(o => o.id !== id));
-        addLog('Delete', 'Owner', `Proprietário movido para lixeira: ${owner.name}`);
+        try {
+          await addToTrash(owner, 'Owner', owner.name);
+          await ownersService.delete(id);
+          setOwners(prev => prev.filter(o => o.id !== id));
+          addLog('Delete', 'Owner', `Proprietário movido para lixeira: ${owner.name}`);
+        } catch (error) {
+          console.error('Error deleting owner:', error);
+          alert('Erro ao remover proprietário');
+        }
     }
   };
 
-  // Document CRUD
-  const handleAddDocument = (doc: Document) => {
-    setDocuments(prev => [doc, ...prev]);
-    addLog('Create', 'Document', `Documento adicionado: ${doc.name}`, `Categoria: ${doc.category}`);
-  };
-  const handleEditDocument = (doc: Document) => {
-    setDocuments(prev => prev.map(d => d.id === doc.id ? doc : d));
-    addLog('Update', 'Document', `Documento atualizado: ${doc.name}`, `Categoria: ${doc.category}`);
-  };
-  const handleDeleteDocument = (id: string) => {
-    const doc = documents.find(d => d.id === id);
-    if(doc) {
-        addToTrash(doc, 'Document', doc.name);
-        setDocuments(prev => prev.filter(d => d.id !== id));
-        addLog('Delete', 'Document', `Documento movido para lixeira: ${doc.name}`);
+  const handleAddDocument = async (doc: Document) => {
+    try {
+      await documentsService.create(doc);
+      setDocuments(prev => [doc, ...prev]);
+      addLog('Create', 'Document', `Documento adicionado: ${doc.name}`, `Categoria: ${doc.category}`);
+    } catch (error) {
+      console.error('Error adding document:', error);
+      alert('Erro ao adicionar documento');
     }
   };
-  
-  // Employee CRUD
-  const handleAddEmployee = (emp: Employee) => {
-    setEmployees(prev => [...prev, emp]);
-    addLog('Create', 'Employee', `Colaborador adicionado: ${emp.name}`);
+  const handleEditDocument = async (doc: Document) => {
+    try {
+      await documentsService.update(doc);
+      setDocuments(prev => prev.map(d => d.id === doc.id ? doc : d));
+      addLog('Update', 'Document', `Documento atualizado: ${doc.name}`, `Categoria: ${doc.category}`);
+    } catch (error) {
+      console.error('Error editing document:', error);
+      alert('Erro ao editar documento');
+    }
+  };
+  const handleDeleteDocument = async (id: string) => {
+    const doc = documents.find(d => d.id === id);
+    if(doc) {
+        try {
+          await addToTrash(doc, 'Document', doc.name);
+          await documentsService.delete(id);
+          setDocuments(prev => prev.filter(d => d.id !== id));
+          addLog('Delete', 'Document', `Documento movido para lixeira: ${doc.name}`);
+        } catch (error) {
+          console.error('Error deleting document:', error);
+          alert('Erro ao remover documento');
+        }
+    }
+  };
+
+  const handleAddEmployee = async (emp: Employee) => {
+    try {
+      await employeesService.create(emp);
+      setEmployees(prev => [...prev, emp]);
+      addLog('Create', 'Employee', `Colaborador adicionado: ${emp.name}`);
+    } catch (error) {
+      console.error('Error adding employee:', error);
+      alert('Erro ao adicionar colaborador');
+    }
   };
 
   const NavItem = ({ view, icon: Icon, label }: { view: ViewState, icon: any, label: string }) => (
@@ -392,14 +620,29 @@ const App: React.FC = () => {
     </button>
   );
 
+  if (loading) {
+    return (
+      <div className="h-screen w-full bg-slate-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 size={48} className="animate-spin text-blue-600 mx-auto mb-4" />
+          <p className="text-slate-600">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <AuthScreen onAuth={handleAuth} />;
+  }
+
   return (
     <div className="h-screen w-full bg-slate-50 flex flex-col md:flex-row font-sans text-slate-900 overflow-hidden">
-      
+
       {/* Sidebar */}
       <aside className="w-full md:w-64 bg-white border-r border-slate-200 p-6 flex flex-col flex-none md:h-full z-20 overflow-y-auto">
         <div className="flex items-center gap-2 mb-10 px-2 shrink-0">
-          <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold">P</div>
-          <h1 className="text-xl font-bold tracking-tight text-slate-800">Patrimônio<span className="text-indigo-600">360</span></h1>
+          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold">P</div>
+          <h1 className="text-xl font-bold tracking-tight text-slate-800">Patrimônio<span className="text-blue-600">360</span></h1>
         </div>
 
         <nav className="space-y-2 flex-1">
@@ -411,7 +654,7 @@ const App: React.FC = () => {
         </nav>
 
         <div className="mt-auto pt-6 border-t border-slate-100 shrink-0">
-          
+
           {/* Active AI Config Indicator */}
           <div className="px-4 mt-2">
             <div className="text-[10px] uppercase text-slate-400 font-bold tracking-wider mb-1">IA Ativa</div>
@@ -425,6 +668,13 @@ const App: React.FC = () => {
                 </div>
             )}
           </div>
+
+          <button
+            onClick={handleSignOut}
+            className="w-full mt-4 px-4 py-2 text-sm text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
+          >
+            Sair
+          </button>
         </div>
       </aside>
 

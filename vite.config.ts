@@ -6,5 +6,14 @@ export default defineConfig({
   plugins: [react()],
   define: {
     'process.env': process.env
+  },
+  optimizeDeps: {
+    include: ['@supabase/supabase-js'],
+    force: true
+  },
+  server: {
+    fs: {
+      strict: false
+    }
   }
 });

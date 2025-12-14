@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Document, DocumentCategory, Property, AIConfig, Owner } from '../types';
-import { FileText, Upload, Search, Tag, AlertTriangle, Calendar, DollarSign, Loader2, Filter, User, Building, CheckSquare, Square, Trash2, Eye, X, Download, Save, Sparkles, Eraser, Cloud, ChevronDown, CheckCircle, Link, ExternalLink } from 'lucide-react';
+import { Document, DocumentCategory, Property, AIConfig, Owner, SummaryEditHistory } from '../types';
+import { FileText, Upload, Search, Tag, AlertTriangle, Calendar, DollarSign, Loader2, Filter, User, Building, CheckSquare, Square, Trash2, Eye, X, Download, Save, Sparkles, Eraser, Cloud, ChevronDown, CheckCircle, Link, ExternalLink, Undo, Edit3 } from 'lucide-react';
 import { analyzeDocumentContent } from '../services/geminiService';
 import { getNextId } from '../services/idService';
 
@@ -121,6 +121,8 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({ documents, properties, ow
   const [selectedDocIds, setSelectedDocIds] = useState<Set<string>>(new Set());
   const [summaryPanelDoc, setSummaryPanelDoc] = useState<Document | null>(null);
   const [isAnalyzingDoc, setIsAnalyzingDoc] = useState<string | null>(null);
+  const [isEditingSummary, setIsEditingSummary] = useState(false);
+  const [editedSummary, setEditedSummary] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [filterFlags, setFilterFlags] = useState({
@@ -475,6 +477,57 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({ documents, properties, ow
     return new Blob([u8arr], { type: mime });
   };
 
+  const handleStartEditSummary = (doc: Document) => {
+    setIsEditingSummary(true);
+    setEditedSummary(doc.summary || '');
+  };
+
+  const handleSaveSummary = () => {
+    if (!summaryPanelDoc) return;
+
+    const newHistory: SummaryEditHistory = {
+      timestamp: new Date().toISOString(),
+      content: summaryPanelDoc.summary || '',
+      editedBy: 'Usuário'
+    };
+
+    const updatedDoc: Document = {
+      ...summaryPanelDoc,
+      summary: editedSummary,
+      summaryHistory: [newHistory, ...(summaryPanelDoc.summaryHistory || [])]
+    };
+
+    onDeleteDocument(summaryPanelDoc.id);
+    onAddDocument(updatedDoc);
+    setSummaryPanelDoc(updatedDoc);
+    setIsEditingSummary(false);
+  };
+
+  const handleUndoSummary = () => {
+    if (!summaryPanelDoc || !summaryPanelDoc.summaryHistory || summaryPanelDoc.summaryHistory.length === 0) {
+      alert('Não há histórico de edições para desfazer.');
+      return;
+    }
+
+    const previousVersion = summaryPanelDoc.summaryHistory[0];
+    const updatedDoc: Document = {
+      ...summaryPanelDoc,
+      summary: previousVersion.content,
+      summaryHistory: summaryPanelDoc.summaryHistory.slice(1)
+    };
+
+    onDeleteDocument(summaryPanelDoc.id);
+    onAddDocument(updatedDoc);
+    setSummaryPanelDoc(updatedDoc);
+    setEditedSummary(previousVersion.content);
+  };
+
+  const handleOpenSummaryPanel = (doc: Document) => {
+    setSummaryPanelDoc(doc);
+    setIsEditingSummary(false);
+    setEditedSummary(doc.summary || '');
+  };
+
   return (
     <div className="p-6 h-full flex flex-col" onPaste={handlePaste}>
       <div className="flex justify-between items-center mb-6">
@@ -697,13 +750,14 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({ documents, properties, ow
               return (
                 <div
                   key={doc.id}
-                  className={`bg-white p-5 rounded-xl border ${isSelected ? 'border-indigo-400 ring-2 ring-indigo-100' : 'border-slate-200'} shadow-sm hover:shadow-md transition-all relative group`}
+                  className={`bg-white p-5 rounded-xl border ${isSelected ? 'border-indigo-400 ring-2 ring-indigo-100' : 'border-slate-200'} shadow-sm hover:shadow-md transition-all relative group cursor-pointer`}
+                  onClick={() => handleOpenSummaryPanel(doc)}
                 >
                   <div className="flex items-start gap-4">
                     {/* Checkbox */}
                     <button
                       type="button"
-                      onClick={() => toggleDocSelection(doc.id)}
+                      onClick={(e) => { e.stopPropagation(); toggleDocSelection(doc.id); }}
                       className="mt-1 shrink-0"
                     >
                       {isSelected ? (
@@ -766,27 +820,23 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({ documents, properties, ow
                     <div className="flex items-center gap-1 shrink-0">
                       <button
                         type="button"
-                        onClick={() => handleOpenInBrowser(doc)}
-                        className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                        title="Abrir no Navegador"
-                      >
-                        <ExternalLink size={18} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setSummaryPanelDoc(doc)}
-                        className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
-                        title="Ver Resumo Inteligente"
-                      >
-                        <Sparkles size={18} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setViewingDoc(doc)}
+                        onClick={(e) => { e.stopPropagation(); setViewingDoc(doc); }}
                         className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
                         title="Visualizar Documento"
                       >
                         <Eye size={18} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); handleOpenSummaryPanel(doc); }}
+                        className={`p-2 rounded transition-colors ${
+                          doc.aiAnalysis && doc.summary && !doc.summary.includes('Erro')
+                            ? 'text-green-600 hover:bg-green-50'
+                            : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'
+                        }`}
+                        title={doc.aiAnalysis && doc.summary && !doc.summary.includes('Erro') ? 'Ver Resumo Inteligente (Analisado)' : 'Analisar com IA'}
+                      >
+                        <Sparkles size={18} />
                       </button>
                       <button
                         type="button"
@@ -846,10 +896,61 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({ documents, properties, ow
               {summaryPanelDoc.aiAnalysis && summaryPanelDoc.summary && !summaryPanelDoc.summary.includes('Erro') ? (
                 <div className="space-y-4">
                   <div>
-                    <p className="text-xs font-bold text-slate-500 uppercase mb-2">Resumo</p>
-                    <p className="text-sm text-slate-700 bg-slate-50 p-4 rounded-lg border border-slate-100 leading-relaxed">
-                      {summaryPanelDoc.summary}
-                    </p>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs font-bold text-slate-500 uppercase">Resumo</p>
+                      {!isEditingSummary && (
+                        <div className="flex gap-1">
+                          {summaryPanelDoc.summaryHistory && summaryPanelDoc.summaryHistory.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={handleUndoSummary}
+                              className="flex items-center gap-1 px-2 py-1 text-xs text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                              title="Desfazer última edição"
+                            >
+                              <Undo size={14} /> Desfazer
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleStartEditSummary(summaryPanelDoc)}
+                            className="flex items-center gap-1 px-2 py-1 text-xs text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
+                            title="Editar resumo"
+                          >
+                            <Edit3 size={14} /> Editar
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    {isEditingSummary ? (
+                      <div className="space-y-2">
+                        <textarea
+                          value={editedSummary}
+                          onChange={(e) => setEditedSummary(e.target.value)}
+                          className="w-full text-sm text-slate-700 bg-white p-4 rounded-lg border border-indigo-300 focus:border-indigo-500 focus:outline-none leading-relaxed min-h-[400px]"
+                          placeholder="Digite o resumo do documento..."
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={handleSaveSummary}
+                            className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded transition-colors"
+                          >
+                            <Save size={14} /> Salvar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setIsEditingSummary(false); setEditedSummary(summaryPanelDoc.summary || ''); }}
+                            className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded transition-colors"
+                          >
+                            <X size={14} /> Cancelar
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-slate-700 bg-slate-50 p-4 rounded-lg border border-slate-100 leading-relaxed whitespace-pre-wrap">
+                        {summaryPanelDoc.summary}
+                      </p>
+                    )}
                   </div>
 
                   <div>
