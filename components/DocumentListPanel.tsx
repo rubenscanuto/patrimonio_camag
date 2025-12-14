@@ -188,71 +188,25 @@ const DocumentListPanel: React.FC<DocumentListPanelProps> = ({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <button
-            type="button"
-            onClick={toggleSelectAll}
-            className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-slate-600 bg-white border border-slate-300 rounded hover:bg-slate-50 transition-colors"
-          >
-            {selectedDocs.size === filteredDocs.length && filteredDocs.length > 0 ? (
-              <CheckSquare size={16} />
-            ) : (
-              <Square size={16} />
-            )}
-            {selectedDocs.size === filteredDocs.length && filteredDocs.length > 0
-              ? 'Desmarcar Todos'
-              : 'Selecionar Todos'}
-          </button>
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors shadow-sm"
+          disabled={isAnalyzing}
+        >
+          <Upload size={18} />
+          {isAnalyzing ? 'Analisando...' : 'Upload'}
+        </button>
 
-          {selectedDocs.size > 0 && (
-            <span className="text-sm text-slate-500">
-              {selectedDocs.size} selecionado(s)
-            </span>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2">
-          {selectedDocs.size > 0 && (
-            <>
-              <button
-                type="button"
-                onClick={handleDownloadSelected}
-                className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-indigo-600 bg-indigo-50 border border-indigo-200 rounded hover:bg-indigo-100 transition-colors"
-              >
-                <Download size={16} />
-                Baixar ({selectedDocs.size})
-              </button>
-              <button
-                type="button"
-                onClick={handleDeleteSelected}
-                className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded hover:bg-red-100 transition-colors"
-              >
-                <Trash2 size={16} />
-                Excluir ({selectedDocs.size})
-              </button>
-            </>
-          )}
-
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 rounded hover:bg-indigo-700 transition-colors"
-            disabled={isAnalyzing}
-          >
-            <Upload size={16} />
-            {isAnalyzing ? 'Analisando...' : 'Upload'}
-          </button>
-
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt"
-            onChange={handleFileUpload}
-            className="hidden"
-          />
-        </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt"
+          onChange={handleFileUpload}
+          className="hidden"
+        />
       </div>
 
       {filteredDocs.length === 0 ? (
@@ -262,8 +216,48 @@ const DocumentListPanel: React.FC<DocumentListPanelProps> = ({
           <p className="text-sm mt-1">Faça upload de documentos para começar</p>
         </div>
       ) : (
-        <div className="space-y-3">
-          {filteredDocs.map(doc => (
+        <>
+          <div className="flex items-center justify-between py-2 border-b border-slate-200">
+            <button
+              type="button"
+              onClick={toggleSelectAll}
+              className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-slate-600 bg-white border border-slate-300 rounded hover:bg-slate-50 transition-colors"
+            >
+              {selectedDocs.size === filteredDocs.length && filteredDocs.length > 0 ? (
+                <CheckSquare size={16} />
+              ) : (
+                <Square size={16} />
+              )}
+              Selecionar Todos
+            </button>
+
+            {selectedDocs.size > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-slate-500">
+                  {selectedDocs.size} selecionado(s)
+                </span>
+                <button
+                  type="button"
+                  onClick={handleDownloadSelected}
+                  className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-indigo-600 bg-indigo-50 border border-indigo-200 rounded hover:bg-indigo-100 transition-colors"
+                >
+                  <Download size={16} />
+                  Baixar ({selectedDocs.size})
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeleteSelected}
+                  className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded hover:bg-red-100 transition-colors"
+                >
+                  <Trash2 size={16} />
+                  Excluir ({selectedDocs.size})
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-3">
+            {filteredDocs.map(doc => (
             <div
               key={doc.id}
               className={`bg-white p-4 rounded-xl border ${
@@ -347,7 +341,8 @@ const DocumentListPanel: React.FC<DocumentListPanelProps> = ({
               </div>
             </div>
           ))}
-        </div>
+          </div>
+        </>
       )}
 
       {viewingDoc && (

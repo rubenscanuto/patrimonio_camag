@@ -209,6 +209,7 @@ const AssetManager: React.FC<AssetManagerProps> = ({
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [activeTab, setActiveTab] = useState<'Info' | 'Docs' | 'Custom' | 'Valuation'>('Info');
   const [selectedTagFilter, setSelectedTagFilter] = useState<string>('All');
+  const [propertyModalTab, setPropertyModalTab] = useState<'Data' | 'Documents'>('Data');
   
   // Document Viewing State
   const [viewingDoc, setViewingDoc] = useState<Document | null>(null);
@@ -1153,12 +1154,33 @@ const AssetManager: React.FC<AssetManagerProps> = ({
           <div className={`bg-white rounded-xl w-full ${aiSummary ? 'max-w-6xl' : 'max-w-2xl'} max-h-[90vh] overflow-hidden animate-in zoom-in-95 flex flex-col`}>
             <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-xl shrink-0">
               <h3 className="text-xl font-bold">{isEditingMode ? 'Editar Imóvel' : 'Cadastrar Novo Imóvel'}</h3>
-              <button type="button" onClick={() => { setShowAddModal(false); resetForm(); }}><X size={24} className="text-slate-400"/></button>
+              <button type="button" onClick={() => { setShowAddModal(false); resetForm(); setPropertyModalTab('Data'); }}><X size={24} className="text-slate-400"/></button>
             </div>
-            
+
+            <div className="flex border-b border-slate-200 px-6 shrink-0">
+              <button
+                onClick={() => setPropertyModalTab('Data')}
+                className={`py-3 px-4 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
+                  propertyModalTab === 'Data' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-indigo-600'
+                }`}
+              >
+                <Building size={16} /> Dados Cadastrais
+              </button>
+              <button
+                onClick={() => setPropertyModalTab('Documents')}
+                className={`py-3 px-4 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
+                  propertyModalTab === 'Documents' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-indigo-600'
+                }`}
+              >
+                <FileText size={16} /> Documentos ({newProp.id ? allDocuments.filter(d => d.relatedPropertyId === newProp.id).length : 0})
+              </button>
+            </div>
+
             <div className="flex flex-1 overflow-hidden">
                 {/* Form Side */}
                 <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                  {propertyModalTab === 'Data' ? (
+                    <>
                     
                     {/* SECTION 1: PHOTO UPLOAD */}
                     <div className="mb-4">
@@ -1513,10 +1535,21 @@ const AssetManager: React.FC<AssetManagerProps> = ({
                             </div>
                         </div>
                     </form>
+                    </>
+                  ) : (
+                    <DocumentListPanel
+                      documents={allDocuments}
+                      relatedPropertyId={newProp.id}
+                      onAddDocument={onAddDocument}
+                      onEditDocument={onEditDocument}
+                      onDeleteDocument={onDeleteDocument}
+                      aiConfig={aiConfig}
+                    />
+                  )}
                 </div>
 
                 {/* AI Summary Side Panel (Optional) */}
-                {aiSummary && (
+                {aiSummary && propertyModalTab === 'Data' && (
                     <div className="w-80 bg-indigo-50 border-l border-indigo-100 p-6 overflow-y-auto">
                         <div className="flex items-center gap-2 mb-4 text-indigo-700 font-bold">
                             <Sparkles size={20} />
@@ -1540,12 +1573,36 @@ const AssetManager: React.FC<AssetManagerProps> = ({
                     </div>
                 )}
             </div>
-            
-            <div className="p-6 border-t border-slate-100 flex justify-end gap-2 bg-slate-50 rounded-b-xl shrink-0">
-              <button type="button" onClick={() => { setShowAddModal(false); resetForm(); }} className="px-4 py-2 text-slate-600 hover:bg-slate-200 rounded">Cancelar</button>
-              <button form="propForm" type="submit" className="px-6 py-2 bg-indigo-600 text-white rounded font-medium hover:bg-indigo-700">
-                {isEditingMode ? 'Salvar Alterações' : 'Salvar Imóvel'}
-              </button>
+
+            <div className="p-6 border-t border-slate-100 flex justify-between items-center gap-3 bg-slate-50 rounded-b-xl shrink-0">
+              <div>
+                {propertyModalTab === 'Documents' && (
+                  <button
+                    type="button"
+                    onClick={() => setPropertyModalTab('Data')}
+                    className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors flex items-center gap-2"
+                  >
+                    <ChevronDown size={18} className="rotate-90"/> Voltar aos Dados Cadastrais
+                  </button>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => { setShowAddModal(false); resetForm(); setPropertyModalTab('Data'); }} className="px-4 py-2 text-slate-600 hover:bg-slate-200 rounded">Cancelar</button>
+                {propertyModalTab === 'Data' && (
+                  <button form="propForm" type="submit" className="px-6 py-2 bg-indigo-600 text-white rounded font-medium hover:bg-indigo-700">
+                    {isEditingMode ? 'Salvar Alterações' : 'Salvar Imóvel'}
+                  </button>
+                )}
+                {propertyModalTab === 'Documents' && (
+                  <button
+                    type="button"
+                    onClick={() => { setShowAddModal(false); resetForm(); setPropertyModalTab('Data'); }}
+                    className="px-6 py-2 bg-indigo-600 text-white rounded font-medium hover:bg-indigo-700"
+                  >
+                    {isEditingMode ? 'Salvar Alterações' : 'Concluir Cadastro'}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
