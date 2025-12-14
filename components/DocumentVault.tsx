@@ -353,7 +353,7 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({ documents, properties, ow
     <div className="p-6 h-full flex flex-col" onPaste={handlePaste}>
        <div className="flex justify-between items-center mb-6">
         <div>
-          <h2 className="text-3xl font-bold text-slate-800">Cofre Digital</h2>
+          <h2 className="text-3xl font-bold text-slate-800">Arquivo Digital</h2>
           <p className="text-slate-500">Arquivamento inteligente e análise de contratos.</p>
         </div>
         <button type="button" onClick={() => setIsUploading(!isUploading)} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors">

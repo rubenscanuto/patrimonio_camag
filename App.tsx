@@ -412,7 +412,7 @@ const App: React.FC = () => {
         <nav className="space-y-2 flex-1">
           <NavItem view="dashboard" icon={LayoutDashboard} label="Visão Geral" />
           <NavItem view="assets" icon={Building2} label="Imóveis" />
-          <NavItem view="documents" icon={FolderOpen} label="Documentos" />
+          <NavItem view="documents" icon={FolderOpen} label="Arquivo Digital" />
           <NavItem view="registers" icon={Database} label="Cadastros" />
           <NavItem view="audit" icon={ClipboardList} label="Auditoria e Controle" />
         </nav>

@@ -271,6 +271,7 @@ export const analyzeDocumentContent = async (
   const model = modelName || "gemini-2.5-flash";
   
   // Base Schema Definitions
+  // Important: structuredData must be an array of objects to avoid empty-property object error in Gemini Schema
   const baseSchema: Schema = {
       type: Type.OBJECT,
       properties: {
@@ -280,8 +281,15 @@ export const analyzeDocumentContent = async (
           keyDates: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Important dates found in document (e.g., expiry, signing)." },
           monetaryValues: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Monetary values found, formatted in BRL." },
           structuredData: { 
-              type: Type.OBJECT, 
+              type: Type.ARRAY, 
               description: "Extract up to 10 key-value pairs of the most relevant data from this document. Keys should be human readable in Portuguese.",
+              items: {
+                  type: Type.OBJECT,
+                  properties: {
+                      key: { type: Type.STRING, description: "Field name" },
+                      value: { type: Type.STRING, description: "Extracted value" }
+                  }
+              },
               nullable: true
           }
       }
@@ -368,7 +376,20 @@ export const analyzeDocumentContent = async (
               responseSchema: schema 
           }
       });
-      return JSON.parse(response.text || "{}");
+      const parsed = JSON.parse(response.text || "{}");
+
+      // Normalize structuredData from Array<{key, value}> back to Record<string, string> for frontend compatibility
+      if (Array.isArray(parsed.structuredData)) {
+          const kvMap: Record<string, string> = {};
+          parsed.structuredData.forEach((item: any) => {
+              if (item.key && item.value) {
+                  kvMap[item.key] = String(item.value);
+              }
+          });
+          parsed.structuredData = kvMap;
+      }
+
+      return parsed;
   } catch (e) {
       console.error("Gemini Analysis Error:", e);
       throw e;
