@@ -1,10 +1,11 @@
 import { extractTextFromPDF, isPDF } from './pdfService';
+import Tesseract from 'tesseract.js';
 
 export interface ProcessedDocument {
-  imageBlob?: Blob;       // O arquivo WebP otimizado (para imagens)
-  extractedText: string;  // O texto puro (para enviar à IA e economizar tokens)
-  previewUrl: string;     // URL para exibir na tela
-  originalDataUrl: string; // Data URL original (para salvar no banco)
+  imageBlob?: Blob;
+  extractedText: string;
+  previewUrl: string;
+  originalDataUrl: string;
   fileType: 'pdf' | 'image' | 'text';
 }
 
@@ -25,8 +26,8 @@ function isTextFile(fileName: string, fileType: string): boolean {
 }
 
 /**
- * Processa um arquivo de imagem para otimização.
- * Aplica: Redimensionamento (150DPI), Escala de Cinza, Conversão WebP.
+ * Processa um arquivo de imagem para otimização com OCR.
+ * Aplica: Redimensionamento (150DPI), Escala de Cinza, Conversão WebP, OCR (Tesseract).
  */
 export async function processImageForUpload(file: File, dataUrl: string): Promise<ProcessedDocument> {
   return new Promise((resolve, reject) => {
@@ -34,7 +35,8 @@ export async function processImageForUpload(file: File, dataUrl: string): Promis
     img.src = dataUrl;
 
     img.onload = async () => {
-      // 1. CONFIGURAR O CANVAS (A "Mágica" da Resolução)
+      console.log('[processImage] Iniciando processamento de imagem:', file.name);
+
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
 
@@ -43,8 +45,6 @@ export async function processImageForUpload(file: File, dataUrl: string): Promis
         return;
       }
 
-      // Definição de Resolução Ideal (aprox. 150 DPI para um A4)
-      // A4 largura ~ 210mm. 150 DPI = ~1240 pixels de largura.
       const TARGET_WIDTH = 1240;
       const scaleFactor = TARGET_WIDTH / img.width;
       const targetHeight = img.height * scaleFactor;
@@ -52,32 +52,40 @@ export async function processImageForUpload(file: File, dataUrl: string): Promis
       canvas.width = TARGET_WIDTH;
       canvas.height = targetHeight;
 
-      // 2. APLICAR ESCALA DE CINZA (Grayscale)
       ctx.filter = 'grayscale(100%) contrast(1.2)';
-
-      // Desenha a imagem redimensionada no canvas
       ctx.drawImage(img, 0, 0, TARGET_WIDTH, targetHeight);
 
-      // 3. CONVERTER PARA WEBP (Formato)
-      // Qualidade 0.8 (80%) é o equilíbrio perfeito entre tamanho e legibilidade
       canvas.toBlob(async (blob) => {
         if (!blob) {
           reject(new Error('Falha na conversão para WebP'));
           return;
         }
 
-        // Criar URL para visualização
+        console.log('[processImage] Imagem convertida para WebP');
         const optimizedImageUrl = URL.createObjectURL(blob);
 
         try {
-          console.log('Imagem otimizada com sucesso');
+          console.log('[processImage] Iniciando OCR com Tesseract...');
 
-          // Converter blob WebP para dataURL para salvar no banco
+          const { data: { text } } = await Tesseract.recognize(
+            blob,
+            'por',
+            {
+              logger: (m) => {
+                if (m.status === 'recognizing text') {
+                  console.log(`[OCR] Progresso: ${Math.round(m.progress * 100)}%`);
+                }
+              }
+            }
+          );
+
+          console.log('[processImage] OCR concluído. Texto extraído:', text.substring(0, 200));
+
           const reader = new FileReader();
           reader.onloadend = () => {
             resolve({
               imageBlob: blob,
-              extractedText: `Arquivo de imagem: ${file.name}\nTipo: ${file.type}\n\nImagem anexada. Analise o conteúdo visualmente.`,
+              extractedText: text.trim() || `Arquivo de imagem: ${file.name}\nNenhum texto detectado na imagem.`,
               previewUrl: optimizedImageUrl,
               originalDataUrl: reader.result as string,
               fileType: 'image'
@@ -86,8 +94,18 @@ export async function processImageForUpload(file: File, dataUrl: string): Promis
           reader.readAsDataURL(blob);
 
         } catch (error) {
-          console.error('Erro ao processar imagem:', error);
-          reject(error);
+          console.error('[processImage] Erro no OCR:', error);
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            resolve({
+              imageBlob: blob,
+              extractedText: `Arquivo de imagem: ${file.name}\nErro ao processar OCR. Imagem salva para referência.`,
+              previewUrl: optimizedImageUrl,
+              originalDataUrl: reader.result as string,
+              fileType: 'image'
+            });
+          };
+          reader.readAsDataURL(blob);
         }
 
       }, 'image/webp', 0.8);

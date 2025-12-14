@@ -133,28 +133,32 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({ documents, properties, ow
     general: true
   });
 
-  const processFiles = (fileList: FileList | File[]) => {
+  const processFiles = async (fileList: FileList | File[]) => {
       const files: File[] = Array.from(fileList);
-      const newDocs: PendingDoc[] = [];
-      
-      files.forEach(file => {
-          const reader = new FileReader();
-          reader.onload = (ev) => {
-              newDocs.push({
-                  name: file.name,
-                  content: ev.target?.result as string || '',
-                  fileObject: file
-              });
-              if (newDocs.length === files.length) {
-                  setPendingDocs(prev => [...prev, ...newDocs]);
-              }
+      console.log('[DocumentVault] Processando', files.length, 'arquivo(s)');
+
+      setIsAnalyzing(true);
+
+      for (const file of files) {
+        try {
+          console.log('[DocumentVault] Processando arquivo:', file.name);
+          const processed = await processDocumentForUpload(file);
+
+          const newDoc: PendingDoc = {
+            name: file.name,
+            content: processed.extractedText,
+            fileObject: file
           };
-          if(file.type.includes('text') || file.type.includes('json')) {
-              reader.readAsText(file);
-          } else {
-              reader.readAsDataURL(file); // Store binary files as Base64 Data URL
-          }
-      });
+
+          setPendingDocs(prev => [...prev, newDoc]);
+          console.log('[DocumentVault] Arquivo processado com sucesso:', file.name);
+        } catch (error) {
+          console.error('[DocumentVault] Erro ao processar arquivo:', file.name, error);
+          alert(`Erro ao processar ${file.name}: ${error}`);
+        }
+      }
+
+      setIsAnalyzing(false);
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -228,38 +232,18 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({ documents, properties, ow
 
         if (process && aiConfig) {
             try {
-                console.log(`Processando documento: ${doc.name}`);
-
-                let textToAnalyze = doc.content;
-
-                if (doc.content.startsWith('data:')) {
-                    console.log('Arquivo detectado como binário (PDF/Imagem)');
-
-                    if (isPDF(doc.name)) {
-                        try {
-                            console.log('Extraindo texto do PDF...');
-                            textToAnalyze = await extractTextFromPDF(doc.content);
-                            console.log('Texto extraído do PDF:', textToAnalyze.substring(0, 200));
-                        } catch (pdfError) {
-                            console.error('Erro ao extrair texto do PDF:', pdfError);
-                            textToAnalyze = `Arquivo PDF: ${doc.name}\n\nNão foi possível extrair texto automaticamente. Documento anexado para referência.`;
-                        }
-                    } else {
-                        textToAnalyze = `Arquivo: ${doc.name}\nTipo: ${doc.fileObject.type}\n\nEste é um arquivo binário (imagem). Analise com base no nome do arquivo e tipo.`;
-                    }
-                } else {
-                    console.log(`Texto extraído (${doc.content.length} caracteres)`);
-                }
+                console.log('[handleUploadAction] Analisando com IA:', doc.name);
+                console.log('[handleUploadAction] Texto extraído:', doc.content.substring(0, 200));
 
                 const analysis = await analyzeDocumentContent(
-                    textToAnalyze,
+                    doc.content,
                     aiConfig.apiKey,
                     'General',
                     aiConfig.provider,
                     aiConfig.modelName
                 );
 
-                console.log('Análise recebida:', analysis);
+                console.log('[handleUploadAction] Análise recebida:', analysis);
 
                 aiResult = {
                     category: analysis.category,
@@ -269,15 +253,15 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({ documents, properties, ow
                     monetaryValues: analysis.monetaryValues
                 };
 
-                if (!linkedPropId && !linkedOwnerId && textToAnalyze.length > 50) {
-                    const text = textToAnalyze.toLowerCase();
+                if (!linkedPropId && !linkedOwnerId && doc.content.length > 50) {
+                    const text = doc.content.toLowerCase();
                     const matchedProp = properties.find(p =>
                         text.includes(p.name.toLowerCase()) ||
                         text.includes(p.address.toLowerCase())
                     );
                     if (matchedProp) {
                         linkedPropId = matchedProp.id;
-                        console.log('Documento vinculado automaticamente ao imóvel:', matchedProp.name);
+                        console.log('[handleUploadAction] Documento vinculado automaticamente ao imóvel:', matchedProp.name);
                     }
 
                     const matchedOwner = owners.find(o =>
@@ -286,21 +270,30 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({ documents, properties, ow
                     );
                     if (matchedOwner) {
                         linkedOwnerId = matchedOwner.id;
-                        console.log('Documento vinculado automaticamente ao proprietário:', matchedOwner.name);
+                        console.log('[handleUploadAction] Documento vinculado automaticamente ao proprietário:', matchedOwner.name);
                     }
                 }
 
             } catch (e: any) {
-                console.error("Falha ao analisar documento", doc.name, e);
+                console.error('[handleUploadAction] Falha ao analisar documento', doc.name, e);
                 aiResult.summary = `Erro no processamento: ${e.message || 'Verifique a chave de API e tente novamente'}`;
             }
+        }
+
+        let contentRawToSave = doc.content;
+        try {
+          const processed = await processDocumentForUpload(doc.fileObject);
+          contentRawToSave = processed.originalDataUrl;
+          console.log('[handleUploadAction] Arquivo processado para armazenamento:', doc.name);
+        } catch (error) {
+          console.error('[handleUploadAction] Erro ao processar para armazenamento:', error);
         }
 
         const newDoc: Document = {
           id: getNextId('Document'),
           name: doc.name,
           uploadDate: new Date().toLocaleDateString('pt-BR'),
-          contentRaw: doc.content,
+          contentRaw: contentRawToSave,
           category: aiResult.category,
           summary: aiResult.summary,
           relatedPropertyId: linkedPropId,
@@ -313,9 +306,11 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({ documents, properties, ow
         };
 
         try {
+          console.log('[handleUploadAction] Salvando documento no banco:', doc.name);
           await onAddDocument(newDoc);
+          console.log('[handleUploadAction] Documento salvo com sucesso:', doc.name);
         } catch (uploadError: any) {
-          console.error('Failed to upload document:', doc.name, uploadError);
+          console.error('[handleUploadAction] Falha ao salvar documento:', doc.name, uploadError);
           alert(`Falha ao carregar ${doc.name}: ${uploadError.message || 'Erro desconhecido'}`);
           setIsAnalyzing(false);
           return;
