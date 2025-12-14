@@ -120,39 +120,36 @@ const INITIAL_EMPLOYEES: Employee[] = [
 
 type ViewState = 'dashboard' | 'assets' | 'documents' | 'registers' | 'audit';
 
+// Persistence Helper
+const loadState = <T,>(key: string, fallback: T): T => {
+  try {
+    const saved = localStorage.getItem(key);
+    return saved ? JSON.parse(saved) : fallback;
+  } catch (e) {
+    console.warn(`Failed to load state for ${key}`, e);
+    return fallback;
+  }
+};
+
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewState>('dashboard');
-  const [properties, setProperties] = useState<Property[]>(INITIAL_PROPERTIES);
-  const [documents, setDocuments] = useState<Document[]>(INITIAL_DOCUMENTS);
-  const [employees, setEmployees] = useState<Employee[]>(INITIAL_EMPLOYEES);
-  const [tags, setTags] = useState<PropertyTag[]>(INITIAL_TAGS);
-  const [owners, setOwners] = useState<Owner[]>([]);
-  const [cloudAccounts, setCloudAccounts] = useState<CloudAccount[]>([]);
-  const [isUpdatingIndices, setIsUpdatingIndices] = useState(false);
   
-  // New States for Logs and Trash
-  const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [trash, setTrash] = useState<TrashItem[]>([]);
-
-  // Indices Database - Initialize from LocalStorage
-  const [indicesDatabase, setIndicesDatabase] = useState<MonthlyIndexData[]>(() => {
-    const saved = localStorage.getItem('indicesDatabase');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  // Save to LocalStorage whenever indices change
-  useEffect(() => {
-    localStorage.setItem('indicesDatabase', JSON.stringify(indicesDatabase));
-  }, [indicesDatabase]);
-
-  // User & Settings State
-  const [userProfile, setUserProfile] = useState<UserProfile>({
+  // Persistent States
+  const [properties, setProperties] = useState<Property[]>(() => loadState('patrimonio_properties', INITIAL_PROPERTIES));
+  const [documents, setDocuments] = useState<Document[]>(() => loadState('patrimonio_documents', INITIAL_DOCUMENTS));
+  const [employees, setEmployees] = useState<Employee[]>(() => loadState('patrimonio_employees', INITIAL_EMPLOYEES));
+  const [tags, setTags] = useState<PropertyTag[]>(() => loadState('patrimonio_tags', INITIAL_TAGS));
+  const [owners, setOwners] = useState<Owner[]>(() => loadState('patrimonio_owners', []));
+  const [cloudAccounts, setCloudAccounts] = useState<CloudAccount[]>(() => loadState('patrimonio_cloud_accounts', []));
+  
+  // Settings & Profiles
+  const [userProfile, setUserProfile] = useState<UserProfile>(() => loadState('patrimonio_user_profile', {
     name: 'Usuário Admin',
     email: 'admin@patrimonio360.com',
     companyName: 'Holding Familiar'
-  });
+  }));
 
-  const [aiConfigs, setAiConfigs] = useState<AIConfig[]>([
+  const [aiConfigs, setAiConfigs] = useState<AIConfig[]>(() => loadState('patrimonio_ai_configs', [
     {
       id: 'default-1',
       label: 'Gemini Default',
@@ -161,16 +158,30 @@ const App: React.FC = () => {
       modelName: 'gemini-2.5-flash',
       isActive: true
     }
-  ]);
+  ]));
+
+  // Logs & Trash
+  const [logs, setLogs] = useState<LogEntry[]>(() => loadState('patrimonio_logs', []));
+  const [trash, setTrash] = useState<TrashItem[]>(() => loadState('patrimonio_trash', []));
+
+  // Indices Database
+  const [indicesDatabase, setIndicesDatabase] = useState<MonthlyIndexData[]>(() => loadState('indicesDatabase', []));
+  const [isUpdatingIndices, setIsUpdatingIndices] = useState(false);
+
+  // --- Effects for Persistence ---
+  useEffect(() => { localStorage.setItem('patrimonio_properties', JSON.stringify(properties)); }, [properties]);
+  useEffect(() => { localStorage.setItem('patrimonio_documents', JSON.stringify(documents)); }, [documents]);
+  useEffect(() => { localStorage.setItem('patrimonio_employees', JSON.stringify(employees)); }, [employees]);
+  useEffect(() => { localStorage.setItem('patrimonio_tags', JSON.stringify(tags)); }, [tags]);
+  useEffect(() => { localStorage.setItem('patrimonio_owners', JSON.stringify(owners)); }, [owners]);
+  useEffect(() => { localStorage.setItem('patrimonio_cloud_accounts', JSON.stringify(cloudAccounts)); }, [cloudAccounts]);
+  useEffect(() => { localStorage.setItem('patrimonio_user_profile', JSON.stringify(userProfile)); }, [userProfile]);
+  useEffect(() => { localStorage.setItem('patrimonio_ai_configs', JSON.stringify(aiConfigs)); }, [aiConfigs]);
+  useEffect(() => { localStorage.setItem('patrimonio_logs', JSON.stringify(logs)); }, [logs]);
+  useEffect(() => { localStorage.setItem('patrimonio_trash', JSON.stringify(trash)); }, [trash]);
+  useEffect(() => { localStorage.setItem('indicesDatabase', JSON.stringify(indicesDatabase)); }, [indicesDatabase]);
 
   const activeAIConfig = aiConfigs.find(c => c.isActive);
-
-  // Auto-activate first AI config if none is active
-  useEffect(() => {
-    if (aiConfigs.length > 0 && !aiConfigs.some(c => c.isActive)) {
-      setAiConfigs(prev => prev.map((c, idx) => ({ ...c, isActive: idx === 0 })));
-    }
-  }, [aiConfigs.length]);
 
   // --- Helper Functions for Logging and Trash ---
 
@@ -254,7 +265,7 @@ const App: React.FC = () => {
       const endStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
 
       try {
-        const newIndices = await fetchHistoricalIndices(startStr, endStr, ['IPCA', 'IGPM', 'INCC', 'SELIC', 'CDI'], activeAIConfig?.apiKey || '');
+        const newIndices = await fetchHistoricalIndices(startStr, endStr, ['IPCA', 'IGPM', 'INCC', 'SELIC', 'CDI'], activeAIConfig?.apiKey || '', activeAIConfig?.modelName || '');
         if(newIndices && newIndices.length > 0) {
             handleUpdateIndicesDatabase(newIndices);
         } else {
@@ -359,10 +370,6 @@ const App: React.FC = () => {
     setDocuments(prev => [doc, ...prev]);
     addLog('Create', 'Document', `Documento adicionado: ${doc.name}`, `Categoria: ${doc.category}`);
   };
-  const handleEditDocument = (doc: Document) => {
-    setDocuments(prev => prev.map(d => d.id === doc.id ? doc : d));
-    addLog('Update', 'Document', `Documento atualizado: ${doc.name}`, `Categoria: ${doc.category}`);
-  };
   const handleDeleteDocument = (id: string) => {
     const doc = documents.find(d => d.id === id);
     if(doc) {
@@ -440,15 +447,15 @@ const App: React.FC = () => {
                onUpdateProperties={handleUpdateProperties}
                onEditProperty={handleEditProperty}
                onDeleteProperty={handleDeleteProperty}
-               allDocuments={documents}
+               allDocuments={documents} 
                onAddDocument={handleAddDocument}
-               onEditDocument={handleEditDocument}
                onDeleteDocument={handleDeleteDocument}
                tags={tags}
                onAddTag={handleAddTag}
                onDeleteTag={handleDeleteTag}
                owners={owners}
                onAddOwner={handleAddOwner}
+               onEditOwner={handleEditOwner}
                aiConfig={activeAIConfig}
                indicesDatabase={indicesDatabase}
                onUpdateIndicesDatabase={handleUpdateIndicesDatabase}
@@ -473,9 +480,8 @@ const App: React.FC = () => {
               onUpdateProperties={handleUpdateProperties}
               onEditProperty={handleEditProperty}
               onDeleteProperty={handleDeleteProperty}
-              allDocuments={documents}
+              allDocuments={documents} 
               onAddDocument={handleAddDocument}
-              onEditDocument={handleEditDocument}
               onDeleteDocument={handleDeleteDocument}
               employees={employees}
               onAddEmployee={handleAddEmployee}

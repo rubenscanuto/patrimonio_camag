@@ -38,7 +38,7 @@ const Dashboard: React.FC<DashboardProps> = ({ properties, documents, aiConfig }
       return;
     }
     setLoadingReport(true);
-    const result = await generatePortfolioReport(properties, aiConfig.apiKey, aiConfig.provider, aiConfig.modelName);
+    const result = await generatePortfolioReport(properties, aiConfig.apiKey, aiConfig.modelName);
     setReport(result);
     setLoadingReport(false);
   };

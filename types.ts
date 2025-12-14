@@ -98,6 +98,7 @@ export interface Document {
     keyDates: string[];
     monetaryValues: string[];
   };
+  extractedData?: Record<string, string>; // Dados estruturados extraídos pela IA e editáveis
 }
 
 export interface Employee {
@@ -120,6 +121,8 @@ export interface AIAnalysisResult {
   extractedPropertyData?: Partial<Property>;
   // Dados extras para extração de proprietário
   extractedOwnerData?: Partial<Owner>;
+  // Dados genéricos chave-valor
+  structuredData?: Record<string, string>;
 }
 
 // Configurações de IA e Usuário

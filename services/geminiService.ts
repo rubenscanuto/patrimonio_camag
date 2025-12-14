@@ -1,5 +1,10 @@
-import { AIAnalysisResult, Property, MonthlyIndexData, AIProvider, AIConfig } from "../types";
-import { generateText, AIServiceConfig } from "./aiService";
+import { GoogleGenAI, Type, Schema } from "@google/genai";
+import { AIAnalysisResult, DocumentCategory, Property, MonthlyIndexData, Owner } from "../types";
+
+// Helper para instanciar o cliente com a chave dinâmica
+const getAIClient = (apiKey: string) => {
+  return new GoogleGenAI({ apiKey });
+};
 
 export interface IndexCorrectionResult {
   indexName: string;
@@ -7,6 +12,11 @@ export interface IndexCorrectionResult {
   adjustedValue: number;
   description: string;
   history: { date: string; value: number }[];
+}
+
+export interface AnalyzableFile {
+  mimeType: string;
+  data: string; // Base64 string sem prefixo
 }
 
 const BCB_SERIES_CODES: Record<string, number> = {
@@ -123,10 +133,11 @@ const fetchFromBCB = async (startDate: string, endDate: string, indices: string[
 };
 
 export const fetchHistoricalIndices = async (
-  startDate: string,
-  endDate: string,
+  startDate: string, 
+  endDate: string, 
   indices: string[],
-  apiKey: string
+  apiKey: string,
+  modelName: string
 ): Promise<MonthlyIndexData[]> => {
   
   // 1. Tentar API Oficial
@@ -137,25 +148,34 @@ export const fetchHistoricalIndices = async (
     console.warn("BCB Fetch failed", err);
   }
 
-  // 2. Fallback: AI Generation (if API key is provided)
+  // 2. Fallback: Google Gemini
   if (apiKey && indices.length > 0) {
       try {
-        const config: AIServiceConfig = {
-          provider: 'Google Gemini',
-          apiKey: apiKey,
-          modelName: 'gemini-2.5-flash'
-        };
-
-        const prompt = `Return a JSON array of monthly percentage rates for ${indices.join(', ')} from ${startDate} to ${endDate}.
-Format: [{ "date": "YYYY-MM", "indices": { "IPCA": 0.5, "IGPM": 0.8 } }]
-Estimates are allowed if exact data is not available.
-Return ONLY the JSON array, no additional text.`;
-
-        const response = await generateText(config, prompt);
-        const jsonMatch = response.match(/\[[\s\S]*\]/);
-        if (jsonMatch) {
-          return JSON.parse(jsonMatch[0]);
-        }
+        const ai = getAIClient(apiKey);
+        const response = await ai.models.generateContent({
+          model: modelName || "gemini-2.5-flash",
+          contents: `Return JSON array of monthly percentage rates for ${indices.join(', ')} from ${startDate} to ${endDate}. Format: [{ "date": "YYYY-MM", "indices": { "IPCA": 0.5 } }]. Estimates allowed.`,
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  date: { type: Type.STRING },
+                  indices: { type: Type.OBJECT, properties: {
+                       IPCA: { type: Type.NUMBER, nullable: true },
+                       IGPM: { type: Type.NUMBER, nullable: true },
+                       INCC: { type: Type.NUMBER, nullable: true },
+                       SELIC: { type: Type.NUMBER, nullable: true },
+                       CDI: { type: Type.NUMBER, nullable: true },
+                  }}
+                }
+              }
+            }
+          }
+        });
+        if (response.text) return JSON.parse(response.text);
       } catch (e) {
         console.error("AI Fetch failed", e);
       }
@@ -180,9 +200,6 @@ export const calculateCorrectionFromLocalData = (
   const startKey = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`;
   let endKey = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, '0')}`;
 
-  let commonMaxDate = endKey; 
-  // Simplified logic for robustness
-  
   const results: IndexCorrectionResult[] = [];
 
   selectedIndices.forEach(index => {
@@ -212,216 +229,160 @@ export const calculateCorrectionFromLocalData = (
   return results;
 };
 
-export const getCoordinatesFromAddress = async (
-  address: string,
-  apiKey: string,
-  provider: AIProvider = 'Google Gemini',
-  modelName: string = 'gemini-2.5-flash'
-): Promise<{lat: number, lng: number} | null> => {
+export const getCoordinatesFromAddress = async (address: string, apiKey: string, modelName: string): Promise<{lat: number, lng: number} | null> => {
   if (!apiKey || !address) return null;
   try {
-    const config: AIServiceConfig = { provider, apiKey, modelName };
-    const prompt = `Identify the latitude and longitude coordinates for the following address: "${address}".
-Return ONLY a valid JSON object in this exact format: {"lat": number, "lng": number}.
-Do not include any explanation or additional text, just the JSON object.`;
-
-    const response = await generateText(config, prompt);
-    const jsonMatch = response.match(/\{[^}]+\}/);
-    if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]);
-    }
-    return null;
-  } catch (e) {
-    console.error('Error getting coordinates:', e);
-    return null;
-  }
+    const ai = getAIClient(apiKey);
+    const response = await ai.models.generateContent({
+      model: modelName || "gemini-2.5-flash",
+      contents: `Identify lat/lng for: "${address}". Return JSON {lat, lng}.`,
+      config: { responseMimeType: "application/json" }
+    });
+    return response.text ? JSON.parse(response.text) : null;
+  } catch (e) { return null; }
 };
 
-export const extractCustomFieldFromText = async (
-  text: string,
-  fieldName: string,
-  apiKey: string,
-  provider: AIProvider = 'Google Gemini',
-  modelName: string = 'gemini-2.5-flash'
-): Promise<string | null> => {
+export const extractCustomFieldFromText = async (text: string, fieldName: string, apiKey: string, modelName: string): Promise<string | null> => {
   if (!apiKey) return null;
   try {
-    const config: AIServiceConfig = { provider, apiKey, modelName };
-    const prompt = `Extract the value for field "${fieldName}" from the following text: "${text}".
-Return ONLY a valid JSON object in this exact format: {"value": "extracted_value"} or {"value": null} if not found.
-Do not include any explanation or additional text, just the JSON object.`;
-
-    const response = await generateText(config, prompt);
-    const jsonMatch = response.match(/\{[^}]+\}/);
-    if (jsonMatch) {
-      const res = JSON.parse(jsonMatch[0]);
-      return res.value === "null" || res.value === null ? null : res.value;
-    }
-    return null;
-  } catch (e) {
-    console.error('Error extracting field:', e);
-    return null;
-  }
+    const ai = getAIClient(apiKey);
+    const response = await ai.models.generateContent({
+      model: modelName || "gemini-2.5-flash",
+      contents: `Find value for "${fieldName}" in text: "${text}". Return JSON {value: string|null}.`,
+      config: { responseMimeType: "application/json" }
+    });
+    const res = JSON.parse(response.text || "{}");
+    return res.value === "null" ? null : res.value;
+  } catch (e) { return null; }
 };
 
+/**
+ * Handles multimodal analysis (Text + Images/PDFs)
+ */
 export const analyzeDocumentContent = async (
-  text: string,
-  apiKey: string,
-  type: 'General' | 'PropertyCreation' | 'OwnerCreation' = 'General',
-  provider: AIProvider = 'Google Gemini',
-  modelName: string = 'gemini-2.5-flash'
+    textContext: string, 
+    files: AnalyzableFile[],
+    apiKey: string, 
+    modelName: string, 
+    type: 'General' | 'PropertyCreation' | 'OwnerCreation' = 'General'
 ): Promise<AIAnalysisResult> => {
-  if (!apiKey) {
-    console.error("Erro: Chave de API não fornecida");
-    throw new Error("Chave de API necessária para análise");
-  }
+  if (!apiKey) throw new Error("API Key required");
+  const ai = getAIClient(apiKey);
+  const model = modelName || "gemini-2.5-flash";
+  
+  // Base Schema Definitions
+  const baseSchema: Schema = {
+      type: Type.OBJECT,
+      properties: {
+          category: { type: Type.STRING, enum: ['Legal', 'Financial', 'Maintenance', 'Tax', 'Acquisition', 'Uncategorized', 'Personal'] },
+          summary: { type: Type.STRING, description: "A comprehensive summary in Brazilian Portuguese." },
+          riskLevel: { type: Type.STRING, enum: ['Low', 'Medium', 'High'] },
+          keyDates: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Important dates found in document (e.g., expiry, signing)." },
+          monetaryValues: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Monetary values found, formatted in BRL." },
+          structuredData: { 
+              type: Type.OBJECT, 
+              description: "Extract up to 10 key-value pairs of the most relevant data from this document. Keys should be human readable in Portuguese.",
+              nullable: true
+          }
+      }
+  };
 
-  if (!text || text.trim().length === 0) {
-    console.error("Erro: Texto do documento vazio");
-    return {
-      category: 'Uncategorized',
-      summary: 'Documento vazio ou sem conteúdo de texto',
-      riskLevel: 'Low',
-      keyDates: [],
-      monetaryValues: []
-    };
-  }
-
-  const config: AIServiceConfig = { provider, apiKey, modelName };
-  console.log(`Iniciando análise com ${provider} (${modelName})...`);
-
-  const textPreview = text.length > 500 ? text.substring(0, 500) + '...' : text;
-  console.log('Preview do texto a ser analisado:', textPreview);
-
-  let prompt = '';
-  const systemPrompt = 'Você é um assistente de IA especializado em analisar documentos jurídicos e financeiros em português brasileiro.';
+  let systemInstruction = "Você é um especialista em análise documental para gestão patrimonial. Analise os documentos fornecidos e extraia as informações chave. IMPORTANTE: Todas as respostas de texto (resumo, categorias, etc) devem estar estritamente em Português do Brasil (pt-BR).";
+  let schema: any = baseSchema;
 
   if (type === 'OwnerCreation') {
-    prompt = `Extraia informações de proprietário/pessoa do seguinte texto de documento e retorne um objeto JSON com esta estrutura:
-{
-  "category": "Personal" ou "Legal",
-  "summary": "Resumo breve do documento",
-  "riskLevel": "Low" | "Medium" | "High",
-  "keyDates": ["data1", "data2"],
-  "monetaryValues": ["valor1", "valor2"],
-  "extractedOwnerData": {
-    "name": "Nome completo",
-    "email": "email@exemplo.com",
-    "phone": "número de telefone",
-    "document": "CPF ou CNPJ",
-    "address": "Endereço completo"
-  }
-}
-
-Texto do documento: ${text}
-
-IMPORTANTE: Retorne APENAS o objeto JSON válido, sem texto adicional antes ou depois.`;
+      systemInstruction += " Extraia dados de Pessoa Física ou Jurídica para cadastro.";
+      schema = {
+          type: Type.OBJECT,
+          properties: {
+              ...baseSchema.properties,
+              extractedOwnerData: {
+                  type: Type.OBJECT,
+                  properties: {
+                      name: { type: Type.STRING },
+                      document: { type: Type.STRING },
+                      rg: { type: Type.STRING },
+                      municipalRegistration: { type: Type.STRING },
+                      address: { type: Type.STRING },
+                      email: { type: Type.STRING },
+                      phone: { type: Type.STRING },
+                      profession: { type: Type.STRING },
+                      naturality: { type: Type.STRING },
+                      maritalStatus: { type: Type.STRING }
+                  }
+              }
+          }
+      };
   } else if (type === 'PropertyCreation') {
-    prompt = `Extraia informações de imóvel do seguinte texto de documento e retorne um objeto JSON com esta estrutura:
-{
-  "category": "Acquisition" | "Legal" | "Financial",
-  "summary": "Resumo breve do documento",
-  "riskLevel": "Low" | "Medium" | "High",
-  "keyDates": ["data1", "data2"],
-  "monetaryValues": ["valor1", "valor2"],
-  "extractedPropertyData": {
-    "name": "Nome do imóvel",
-    "address": "Endereço completo",
-    "value": 0,
-    "purchaseValue": 0,
-    "purchaseDate": "DD/MM/YYYY",
-    "seller": "Nome do vendedor"
+      systemInstruction += " Extraia dados de Imóvel/Propriedade para cadastro.";
+      schema = {
+          type: Type.OBJECT,
+          properties: {
+              ...baseSchema.properties,
+              extractedPropertyData: {
+                  type: Type.OBJECT,
+                  properties: {
+                      name: { type: Type.STRING },
+                      address: { type: Type.STRING },
+                      purchaseValue: { type: Type.NUMBER },
+                      purchaseDate: { type: Type.STRING },
+                      seller: { type: Type.STRING },
+                      registryData: { type: Type.OBJECT, properties: { matricula: { type: Type.STRING }, cartorio: { type: Type.STRING }, livro: { type: Type.STRING }, folha: { type: Type.STRING } } }
+                  }
+              },
+              extractedOwnerData: {
+                  type: Type.OBJECT, 
+                  properties: { name: { type: Type.STRING }, document: { type: Type.STRING } }
+              }
+          }
+      };
   }
-}
 
-Texto do documento: ${text}
+  // Build Parts
+  const parts: any[] = [];
+  
+  if (textContext.trim()) {
+      parts.push({ text: textContext });
+  }
 
-IMPORTANTE: Retorne APENAS o objeto JSON válido, sem texto adicional antes ou depois.`;
-  } else {
-    prompt = `Analise o seguinte documento em detalhes e retorne um objeto JSON com esta estrutura:
-{
-  "category": "Legal" | "Financial" | "Maintenance" | "Tax" | "Acquisition" | "Personal" | "Uncategorized",
-  "summary": "Resumo DETALHADO do documento incluindo: tipo de documento, principais informações (nomes, números de registro, CNPJ/CPF, endereços, valores, datas importantes, finalidade), e quaisquer observações relevantes. Seja específico e informativo.",
-  "riskLevel": "Low" | "Medium" | "High",
-  "keyDates": ["data1", "data2"],
-  "monetaryValues": ["valor1", "valor2"]
-}
+  files.forEach(file => {
+      parts.push({
+          inlineData: {
+              mimeType: file.mimeType,
+              data: file.data
+          }
+      });
+  });
 
-INSTRUÇÕES PARA O RESUMO:
-- Se for um CNPJ/CNH/RG/CPF: inclua nome completo, número do documento, data de emissão, órgão emissor, endereço se disponível
-- Se for um contrato: inclua partes envolvidas, objeto do contrato, valores, prazos, condições principais
-- Se for comprovante: inclua finalidade, valor, data, beneficiário
-- Se for nota fiscal: inclua emissor, valor, itens principais, data
-- Sempre extraia e mencione as informações mais relevantes do documento
-
-Texto do documento: ${text}
-
-IMPORTANTE: Retorne APENAS o objeto JSON válido, sem texto adicional antes ou depois.`;
+  if (parts.length === 0) {
+      return { category: 'Uncategorized', summary: 'Sem conteúdo para analisar.', riskLevel: 'Low', keyDates: [], monetaryValues: [] };
   }
 
   try {
-    console.log('Enviando requisição para a API de IA...');
-    const response = await generateText(config, prompt, systemPrompt);
-    console.log('Resposta recebida da IA:', response.substring(0, 200));
-
-    const jsonMatch = response.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
-      console.log('Análise concluída com sucesso:', parsed.category);
-      return parsed;
-    }
-
-    console.warn('Resposta da IA não contém JSON válido');
-    return {
-      category: 'Uncategorized',
-      summary: 'Não foi possível extrair análise estruturada da resposta da IA',
-      riskLevel: 'Low',
-      keyDates: [],
-      monetaryValues: []
-    };
-  } catch (e: any) {
-    console.error('Erro ao analisar documento:', e);
-    console.error('Detalhes do erro:', e.message || e);
-    return {
-      category: 'Uncategorized',
-      summary: `Erro na análise: ${e.message || 'Erro desconhecido'}`,
-      riskLevel: 'Low',
-      keyDates: [],
-      monetaryValues: []
-    };
+      const response = await ai.models.generateContent({
+          model,
+          contents: { role: 'user', parts: parts },
+          config: { 
+              systemInstruction: systemInstruction,
+              responseMimeType: "application/json", 
+              responseSchema: schema 
+          }
+      });
+      return JSON.parse(response.text || "{}");
+  } catch (e) {
+      console.error("Gemini Analysis Error:", e);
+      throw e;
   }
 };
 
-export const generatePortfolioReport = async (
-  properties: Property[],
-  apiKey: string,
-  provider: AIProvider = 'Google Gemini',
-  modelName: string = 'gemini-2.5-flash'
-): Promise<string> => {
-  if (!apiKey) return "<p>API Key required</p>";
-
-  try {
-    const config: AIServiceConfig = { provider, apiKey, modelName };
-    const propertyData = properties.map(p => ({
-      name: p.name,
-      value: p.value,
-      status: p.status,
-      address: p.address
-    }));
-
-    const prompt = `Generate a comprehensive portfolio report in HTML format for the following real estate properties.
-Include: total value, property breakdown, status analysis, and recommendations.
-Properties: ${JSON.stringify(propertyData)}
-
-Return ONLY valid HTML content (no markdown, no code blocks), starting with <div> and ending with </div>.`;
-
-    const systemPrompt = 'You are a real estate portfolio analyst. Generate professional HTML reports.';
-    const response = await generateText(config, prompt, systemPrompt);
-
-    const htmlMatch = response.match(/<div[\s\S]*<\/div>/i);
-    return htmlMatch ? htmlMatch[0] : response || "<p>Report generation failed</p>";
-  } catch(e) {
-    console.error('Error generating report:', e);
-    return "<p>Report generation failed</p>";
-  }
+export const generatePortfolioReport = async (properties: Property[], apiKey: string, modelName: string): Promise<string> => {
+    if (!apiKey) return "<p>API Key required</p>";
+    try {
+        const ai = getAIClient(apiKey);
+        const res = await ai.models.generateContent({
+            model: modelName || "gemini-2.5-flash",
+            contents: `Summarize portfolio in Brazilian Portuguese (HTML format): ${JSON.stringify(properties.map(p => ({name: p.name, val: p.value, status: p.status})))}`
+        });
+        return res.text || "";
+    } catch(e) { return "<p>Report gen failed</p>"; }
 };
