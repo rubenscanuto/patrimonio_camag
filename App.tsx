@@ -160,17 +160,32 @@ const App: React.FC = () => {
   useEffect(() => {
     checkAuth();
 
-    const subscription = authService.onAuthStateChange((authUser) => {
+    const loadingTimeout = setTimeout(() => {
+      console.warn('Loading timeout reached, forcing loading to false');
+      setLoading(false);
+    }, 10000);
+
+    const subscription = authService.onAuthStateChange(async (authUser) => {
+      console.log('Auth state changed:', authUser?.id || 'logged out');
       setUser(authUser);
       if (authUser) {
-        loadUserData(authUser.id);
+        try {
+          await loadUserData(authUser.id);
+        } catch (error) {
+          console.error('Error in auth state change handler:', error);
+        } finally {
+          setLoading(false);
+          clearTimeout(loadingTimeout);
+        }
       } else {
         setLoading(false);
+        clearTimeout(loadingTimeout);
       }
     });
 
     return () => {
       subscription.unsubscribe();
+      clearTimeout(loadingTimeout);
     };
   }, []);
 
@@ -190,6 +205,7 @@ const App: React.FC = () => {
 
   const loadUserData = async (userId: string) => {
     try {
+      console.log('Loading user data for:', userId);
       const [
         profile,
         propertiesData,
@@ -216,19 +232,21 @@ const App: React.FC = () => {
         trashService.getAll(),
       ]);
 
+      console.log('Data loaded successfully');
       if (profile) setUserProfile(profile);
-      setProperties(propertiesData);
-      setDocuments(documentsData);
-      setEmployees(employeesData);
-      setTags(tagsData);
-      setOwners(ownersData);
-      setAiConfigs(aiConfigsData);
-      setCloudAccounts(cloudAccountsData);
-      setIndicesDatabase(indicesData);
-      setLogs(logsData);
-      setTrash(trashData);
+      setProperties(propertiesData || []);
+      setDocuments(documentsData || []);
+      setEmployees(employeesData || []);
+      setTags(tagsData || []);
+      setOwners(ownersData || []);
+      setAiConfigs(aiConfigsData || []);
+      setCloudAccounts(cloudAccountsData || []);
+      setIndicesDatabase(indicesData || []);
+      setLogs(logsData || []);
+      setTrash(trashData || []);
     } catch (error) {
       console.error('Error loading user data:', error);
+      alert('Erro ao carregar dados do usuário. Verifique sua conexão.');
     }
   };
 
