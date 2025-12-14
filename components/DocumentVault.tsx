@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Document, DocumentCategory, Property, AIConfig, Owner } from '../types';
+import { Document, DocumentCategory, Property, AIConfig, Owner, AIAnalysisResult } from '../types';
 import { FileText, Upload, Search, Tag, AlertTriangle, Calendar, DollarSign, Loader2, Filter, User, Building, CheckSquare, Square, Trash2, Eye, X, Download, Save, Sparkles, Eraser, CloudUpload, ChevronDown, CheckCircle, Link, File, FileSpreadsheet, List } from 'lucide-react';
 import { analyzeDocumentContent, AnalyzableFile } from '../services/geminiService';
 import { getNextId } from '../services/idService';
@@ -13,6 +13,17 @@ interface DocumentVaultProps {
   onDeleteDocument: (id: string) => void;
   onUpdateDocument?: (doc: Document) => void; // Added for saving AI data
   aiConfig?: AIConfig;
+  
+  // Embedded Mode Props
+  isEmbedded?: boolean;
+  preSelectedPropertyId?: string;
+  preSelectedOwnerId?: string;
+  customTitle?: string;
+  
+  // New props for auto-open and data filling
+  alwaysShowUpload?: boolean;
+  analysisContext?: 'General' | 'PropertyCreation' | 'OwnerCreation';
+  onAnalysisComplete?: (result: AIAnalysisResult) => void;
 }
 
 interface PendingDoc {
@@ -82,11 +93,8 @@ const DocumentDataModal: React.FC<{ doc: Document; onClose: () => void; onSave: 
     const handleForceAnalysis = async () => {
         if(!aiConfig) return;
         setIsAnalyzing(true);
-        // This is a "Force Re-analyze" logic that we propagate up or handle here if we had the function context
-        // Since we are inside a modal, better to delegate
         onReanalyze(doc);
         setIsAnalyzing(false); 
-        // Note: The parent will update the doc, and the useEffect will refresh this form.
     };
 
     return (
@@ -100,7 +108,6 @@ const DocumentDataModal: React.FC<{ doc: Document; onClose: () => void; onSave: 
                 </div>
                 
                 <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                    {/* Summary Section */}
                     <div>
                         <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Resumo Executivo (IA)</label>
                         <textarea 
@@ -110,7 +117,6 @@ const DocumentDataModal: React.FC<{ doc: Document; onClose: () => void; onSave: 
                         />
                     </div>
 
-                    {/* Fields Section */}
                     <div>
                         <div className="flex justify-between items-center mb-2">
                             <label className="block text-xs font-bold text-slate-500 uppercase">Campos Extraídos</label>
@@ -156,8 +162,23 @@ const DocumentDataModal: React.FC<{ doc: Document; onClose: () => void; onSave: 
     );
 };
 
-const DocumentVault: React.FC<DocumentVaultProps> = ({ documents, properties, owners = [], onAddDocument, onDeleteDocument, onUpdateDocument, aiConfig }) => {
-  const [isUploading, setIsUploading] = useState(false);
+const DocumentVault: React.FC<DocumentVaultProps> = ({ 
+    documents, 
+    properties, 
+    owners = [], 
+    onAddDocument, 
+    onDeleteDocument, 
+    onUpdateDocument, 
+    aiConfig,
+    isEmbedded = false,
+    preSelectedPropertyId,
+    preSelectedOwnerId,
+    customTitle,
+    alwaysShowUpload = false,
+    analysisContext = 'General',
+    onAnalysisComplete
+}) => {
+  const [isUploading, setIsUploading] = useState(alwaysShowUpload);
   const [pendingDocs, setPendingDocs] = useState<PendingDoc[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -170,16 +191,32 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({ documents, properties, ow
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  const [filterFlags, setFilterFlags] = useState({ property: true, owner: true, general: true });
+  // Update local isUploading if prop changes, unless we are in the middle of operations
+  useEffect(() => {
+      if (alwaysShowUpload) setIsUploading(true);
+  }, [alwaysShowUpload]);
 
-  // ... (Process Files Handlers - Keeping existing)
+  // Auto-hide general filters if we are in specific context
+  const [filterFlags, setFilterFlags] = useState({ 
+      property: !preSelectedOwnerId, 
+      owner: !preSelectedPropertyId, 
+      general: !preSelectedPropertyId && !preSelectedOwnerId 
+  });
+
+  // ... (Process Files Handlers)
   const processFiles = (fileList: FileList | File[]) => {
       const files: File[] = Array.from(fileList);
       const newDocs: PendingDoc[] = [];
       files.forEach(file => {
           const reader = new FileReader();
           reader.onload = (ev) => {
-              newDocs.push({ name: file.name, content: ev.target?.result as string || '', fileObject: file });
+              newDocs.push({ 
+                  name: file.name, 
+                  content: ev.target?.result as string || '', 
+                  fileObject: file,
+                  selectedPropertyId: preSelectedPropertyId,
+                  selectedOwnerId: preSelectedOwnerId
+              });
               if (newDocs.length === files.length) setPendingDocs(prev => [...prev, ...newDocs]);
           };
           if(file.type.includes('text') || file.type.includes('json')) reader.readAsText(file); else reader.readAsDataURL(file);
@@ -197,7 +234,7 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({ documents, properties, ow
     if (process && !aiConfig) { alert("Configure uma chave de API nas Configurações primeiro para processar com IA."); return; }
     setIsAnalyzing(true);
     for (const doc of pendingDocs) {
-        let aiResult: any = { category: 'Uncategorized', summary: process ? 'Processamento falhou.' : 'Upload manual (sem IA).', riskLevel: 'Low', keyDates: [], monetaryValues: [], structuredData: {} };
+        let aiResult: AIAnalysisResult = { category: 'Uncategorized', summary: process ? 'Processamento falhou.' : 'Upload manual (sem IA).', riskLevel: 'Low', keyDates: [], monetaryValues: [], structuredData: {} };
         let linkedPropId = doc.selectedPropertyId;
         let linkedOwnerId = doc.selectedOwnerId;
 
@@ -210,9 +247,26 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({ documents, properties, ow
                      if (matches && matches.length === 3) analyzableFiles.push({ mimeType: matches[1], data: matches[2] });
                 } else { textContext = doc.content; }
 
-                const analysis = await analyzeDocumentContent(textContext, analyzableFiles, aiConfig.apiKey, aiConfig.modelName);
+                // Add context to prompt if available
+                let contextPrompt = textContext;
+                if (preSelectedPropertyId) contextPrompt = "Contexto: Documento de Imóvel. " + textContext;
+                if (preSelectedOwnerId) contextPrompt = "Contexto: Documento de Proprietário/Pessoa. " + textContext;
+
+                const analysis = await analyzeDocumentContent(
+                    contextPrompt, 
+                    analyzableFiles, 
+                    aiConfig.apiKey, 
+                    aiConfig.modelName,
+                    analysisContext // Pass specific context (PropertyCreation/OwnerCreation)
+                );
                 aiResult = { ...analysis };
 
+                // Propagate result up for form filling
+                if (onAnalysisComplete) {
+                    onAnalysisComplete(analysis);
+                }
+
+                // Only auto-link if not already set by context
                 if (!linkedPropId && !linkedOwnerId) {
                     const text = (analysis.summary || doc.name).toLowerCase();
                     const matchedProp = properties.find(p => text.includes(p.name.toLowerCase()) || text.includes(p.address.toLowerCase()));
@@ -227,11 +281,13 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({ documents, properties, ow
           id: getNextId('Document'), name: doc.name, uploadDate: new Date().toLocaleDateString('pt-BR'), contentRaw: doc.content,
           category: aiResult.category, summary: aiResult.summary, relatedPropertyId: linkedPropId, relatedOwnerId: linkedOwnerId,
           aiAnalysis: { riskLevel: aiResult.riskLevel, keyDates: aiResult.keyDates, monetaryValues: aiResult.monetaryValues },
-          extractedData: aiResult.structuredData // Store structured data
+          extractedData: aiResult.structuredData
         };
         onAddDocument(newDoc);
     }
-    setIsAnalyzing(false); setIsUploading(false); setPendingDocs([]);
+    setIsAnalyzing(false); 
+    if(!alwaysShowUpload) setIsUploading(false); // Only close if not in always-show mode
+    setPendingDocs([]);
   };
 
   const handleDownload = (doc: Document) => {
@@ -247,16 +303,9 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({ documents, properties, ow
   const handleRunAI = async (doc: Document) => {
       if (!aiConfig) { alert("IA não configurada."); return; }
       if (!onUpdateDocument) return;
-      
-      // If data already exists, open form instead of running again
-      if (doc.extractedData && Object.keys(doc.extractedData).length > 0) {
-          setEditingDataDoc(doc);
-          return;
-      }
+      if (doc.extractedData && Object.keys(doc.extractedData).length > 0) { setEditingDataDoc(doc); return; }
 
-      // Run Analysis
       try {
-          // Show loader (could add local state for specific row loading if needed, using global here for simplicity)
           const analyzableFiles: AnalyzableFile[] = [];
           let textContext = "";
           if (doc.contentRaw?.startsWith('data:')) {
@@ -264,27 +313,24 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({ documents, properties, ow
                 if (matches && matches.length === 3) analyzableFiles.push({ mimeType: matches[1], data: matches[2] });
           } else { textContext = doc.contentRaw || ''; }
 
-          const analysis = await analyzeDocumentContent(textContext, analyzableFiles, aiConfig.apiKey, aiConfig.modelName);
-          
+          const analysis = await analyzeDocumentContent(textContext, analyzableFiles, aiConfig.apiKey, aiConfig.modelName, analysisContext);
           const updatedDoc = {
-              ...doc,
-              category: analysis.category,
-              summary: analysis.summary,
+              ...doc, category: analysis.category, summary: analysis.summary,
               aiAnalysis: { riskLevel: analysis.riskLevel, keyDates: analysis.keyDates, monetaryValues: analysis.monetaryValues },
               extractedData: analysis.structuredData
           };
           onUpdateDocument(updatedDoc);
-          setEditingDataDoc(updatedDoc); // Open form after analysis
-      } catch (e) {
-          console.error(e);
-          alert("Erro ao executar análise de IA.");
-      }
+          
+          if (onAnalysisComplete) {
+              onAnalysisComplete(analysis);
+          }
+
+          setEditingDataDoc(updatedDoc);
+      } catch (e) { console.error(e); alert("Erro ao executar análise de IA."); }
   };
 
   const handleForceReanalyze = async (doc: Document) => {
       if (!aiConfig || !onUpdateDocument) return;
-      // Close modal to show we are working? Or keep it open with loader? 
-      // For simplicity, we just run the logic similar to handleRunAI but force overwrites
       try {
           const analyzableFiles: AnalyzableFile[] = [];
           let textContext = "";
@@ -293,26 +339,28 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({ documents, properties, ow
                 if (matches && matches.length === 3) analyzableFiles.push({ mimeType: matches[1], data: matches[2] });
           } else { textContext = doc.contentRaw || ''; }
 
-          const analysis = await analyzeDocumentContent(textContext, analyzableFiles, aiConfig.apiKey, aiConfig.modelName);
-          
+          const analysis = await analyzeDocumentContent(textContext, analyzableFiles, aiConfig.apiKey, aiConfig.modelName, analysisContext);
           const updatedDoc = {
-              ...doc,
-              category: analysis.category,
-              summary: analysis.summary,
+              ...doc, category: analysis.category, summary: analysis.summary,
               aiAnalysis: { riskLevel: analysis.riskLevel, keyDates: analysis.keyDates, monetaryValues: analysis.monetaryValues },
               extractedData: analysis.structuredData
           };
           onUpdateDocument(updatedDoc);
-          setEditingDataDoc(updatedDoc); // Refresh modal data
-      } catch (e) {
-          console.error(e);
-          alert("Erro ao reanalisar.");
-      }
+          
+          if (onAnalysisComplete) {
+              onAnalysisComplete(analysis);
+          }
+
+          setEditingDataDoc(updatedDoc);
+      } catch (e) { console.error(e); alert("Erro ao reanalisar."); }
   };
 
   const filteredDocs = documents.filter(doc => {
     const matchesSearch = doc.name.toLowerCase().includes(searchTerm.toLowerCase()) || doc.summary?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategory === 'All' || doc.category === selectedCategory;
+    
+    if (isEmbedded) return matchesSearch && matchesCategory;
+
     const isPropertyDoc = !!doc.relatedPropertyId;
     const isOwnerDoc = !!doc.relatedOwnerId;
     const isGeneralDoc = !isPropertyDoc && !isOwnerDoc;
@@ -320,16 +368,9 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({ documents, properties, ow
     return matchesSearch && matchesCategory && matchesType;
   });
 
-  const toggleSelectAll = () => {
-      if (selectedDocIds.length === filteredDocs.length) setSelectedDocIds([]);
-      else setSelectedDocIds(filteredDocs.map(d => d.id));
-  };
-
-  const toggleSelectOne = (id: string) => {
-      if (selectedDocIds.includes(id)) setSelectedDocIds(prev => prev.filter(d => d !== id));
-      else setSelectedDocIds(prev => [...prev, id]);
-  };
-
+  const toggleSelectAll = () => { if (selectedDocIds.length === filteredDocs.length) setSelectedDocIds([]); else setSelectedDocIds(filteredDocs.map(d => d.id)); };
+  const toggleSelectOne = (id: string) => { if (selectedDocIds.includes(id)) setSelectedDocIds(prev => prev.filter(d => d !== id)); else setSelectedDocIds(prev => [...prev, id]); };
+  
   const handleBatchDelete = () => {
       if (confirm(`Excluir ${selectedDocIds.length} documentos?`)) {
           selectedDocIds.forEach(id => onDeleteDocument(id));
@@ -338,176 +379,160 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({ documents, properties, ow
   };
 
   const handleBatchDownload = async (singlePDF: boolean) => {
-      if (singlePDF) {
-          alert("Nota: Devido a restrições do ambiente (sem bibliotecas de PDF), os arquivos serão baixados individualmente em sequência.");
-      }
-      
+      if (singlePDF) alert("Nota: Os arquivos serão baixados individualmente em sequência.");
       const docsToDownload = documents.filter(d => selectedDocIds.includes(d.id));
       for (const doc of docsToDownload) {
           handleDownload(doc);
-          await new Promise(resolve => setTimeout(resolve, 500)); // Delay to prevent browser blocking
+          await new Promise(resolve => setTimeout(resolve, 500));
       }
   };
 
   return (
-    <div className="p-6 h-full flex flex-col" onPaste={handlePaste}>
-       <div className="flex justify-between items-center mb-6">
-        <div>
-          <h2 className="text-3xl font-bold text-slate-800">Arquivo Digital</h2>
-          <p className="text-slate-500">Arquivamento inteligente e análise de contratos.</p>
-        </div>
-        <button type="button" onClick={() => setIsUploading(!isUploading)} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors">
-          <Upload size={18} /> {isUploading ? 'Cancelar' : 'Novo Documento'}
-        </button>
-      </div>
+    <div className={`flex flex-col h-full ${isEmbedded ? '' : 'p-6'}`} onPaste={handlePaste}>
+       {!isEmbedded && (
+           <div className="flex justify-between items-center mb-6">
+            <div>
+              <h2 className="text-3xl font-bold text-slate-800">Arquivo Digital</h2>
+              <p className="text-slate-500">Arquivamento inteligente e análise de contratos.</p>
+            </div>
+            <button type="button" onClick={() => setIsUploading(!isUploading)} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors">
+              <Upload size={18} /> {isUploading ? 'Cancelar' : 'Novo Documento'}
+            </button>
+          </div>
+       )}
+
+       {/* Header for Embedded Mode */}
+       {isEmbedded && (
+           <div className="flex justify-between items-center mb-4">
+               <h4 className="font-bold text-slate-700">{customTitle || "Documentos Vinculados"}</h4>
+               
+               {/* Only show toggle button if NOT set to always show upload */}
+               {!alwaysShowUpload && (
+                   <button type="button" onClick={() => setIsUploading(!isUploading)} className="text-sm bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-lg flex items-center gap-2 transition-colors border border-indigo-200">
+                      <Upload size={16} /> {isUploading ? 'Fechar Upload' : 'Adicionar'}
+                   </button>
+               )}
+           </div>
+       )}
       
       {/* Upload Area */}
       {isUploading && (
-        <div className="bg-indigo-50 border border-dashed border-indigo-200 rounded-lg p-4 mb-8 animate-in slide-in-from-top-4">
+        <div className={`bg-indigo-50 border border-dashed border-indigo-200 rounded-lg p-4 mb-4 animate-in slide-in-from-top-4 ${isEmbedded ? 'text-sm' : ''}`}>
           <input type="file" multiple className="hidden" ref={fileInputRef} onChange={handleFileUpload} />
           {pendingDocs.length === 0 ? (
-                <div className="flex flex-col items-center justify-center cursor-pointer py-8 hover:bg-indigo-100/50 rounded transition-colors" onClick={() => fileInputRef.current?.click()} onDragOver={handleDragOver} onDrop={handleDrop}>
-                    <div className="flex items-center gap-2 text-indigo-600 font-medium mb-1"><CloudUpload size={24} /><span className="text-lg">Carregamento Inteligente</span></div>
-                    <p className="text-sm text-indigo-400 text-center max-w-md">Clique para selecionar, arraste ou cole arquivos (PDF, Imagens, DOCX). A IA classifica e vincula automaticamente.</p>
+                <div className="flex flex-col items-center justify-center cursor-pointer py-6 hover:bg-indigo-100/50 rounded transition-colors" onClick={() => fileInputRef.current?.click()} onDragOver={handleDragOver} onDrop={handleDrop}>
+                    <div className="flex items-center gap-2 text-indigo-600 font-medium mb-1"><CloudUpload size={24} /><span className="text-base">Carregamento Inteligente</span></div>
+                    <p className="text-xs text-indigo-400 text-center max-w-md">Clique, arraste ou cole (Ctrl+V) arquivos. {aiConfig ? 'A IA processa automaticamente.' : ''}</p>
                 </div>
           ) : (
              <div className="space-y-3">
                  <div className="flex justify-between items-center"><h5 className="text-xs font-bold text-indigo-700 uppercase">Arquivos Selecionados</h5><button onClick={() => setPendingDocs([])} className="text-xs text-red-500 hover:underline">Limpar</button></div>
                  <ul className="bg-white rounded border border-indigo-100 divide-y divide-indigo-50 text-xs">
                     {pendingDocs.map((doc, idx) => (
-                        <li key={idx} className="p-3 flex flex-col md:flex-row md:items-center justify-between gap-3">
-                            <div className="flex items-center gap-3 overflow-hidden flex-1"><div className="truncate font-medium text-slate-700">{doc.name}</div><span className="text-green-600 flex items-center gap-1 font-medium text-xs shrink-0"><CheckCircle size={14} className="text-green-600" /> Pronto</span></div>
-                            <div className="flex flex-col md:flex-row gap-2 md:items-center">
-                                    <div className="flex items-center gap-1 text-slate-400"><Link size={12} /><span className="mr-1">Vincular a:</span></div>
-                                    <div className="w-40"><select className="w-full border border-slate-200 rounded p-1 text-xs bg-slate-50 outline-none focus:border-indigo-500" value={doc.selectedPropertyId || ''} onChange={(e) => updatePendingDocLink(idx, 'selectedPropertyId', e.target.value)}><option value="">Imóvel (Auto/Nenhum)</option>{properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
-                                    <div className="w-40"><select className="w-full border border-slate-200 rounded p-1 text-xs bg-slate-50 outline-none focus:border-indigo-500" value={doc.selectedOwnerId || ''} onChange={(e) => updatePendingDocLink(idx, 'selectedOwnerId', e.target.value)}><option value="">Proprietário (Auto/Nenhum)</option>{owners.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}</select></div>
-                                    <button onClick={() => removePendingDoc(idx)} className="text-slate-400 hover:text-red-500 self-end md:self-center"><X size={14}/></button>
+                        <li key={idx} className="p-2 flex flex-col md:flex-row md:items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 overflow-hidden flex-1"><div className="truncate font-medium text-slate-700">{doc.name}</div><span className="text-green-600 flex items-center gap-1 font-medium text-[10px] shrink-0"><CheckCircle size={12} /> OK</span></div>
+                            <div className="flex gap-2 items-center">
+                                    {(!preSelectedPropertyId && !preSelectedOwnerId) && (
+                                        <>
+                                            <div className="w-32"><select className="w-full border border-slate-200 rounded p-1 text-[10px] bg-slate-50 outline-none" value={doc.selectedPropertyId || ''} onChange={(e) => updatePendingDocLink(idx, 'selectedPropertyId', e.target.value)}><option value="">Imóvel (Auto)</option>{properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
+                                            <div className="w-32"><select className="w-full border border-slate-200 rounded p-1 text-[10px] bg-slate-50 outline-none" value={doc.selectedOwnerId || ''} onChange={(e) => updatePendingDocLink(idx, 'selectedOwnerId', e.target.value)}><option value="">Proprietário (Auto)</option>{owners.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}</select></div>
+                                        </>
+                                    )}
+                                    <button onClick={() => removePendingDoc(idx)} className="text-slate-400 hover:text-red-500"><X size={14}/></button>
                                 </div>
                         </li>
                     ))}
                  </ul>
                  <div className="flex gap-2 justify-end pt-2">
-                     <button type="button" onClick={() => handleUploadAction(false)} disabled={isAnalyzing} className="bg-white border border-indigo-200 text-indigo-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-50 transition-colors">Apenas Anexar</button>
-                     <button type="button" onClick={() => handleUploadAction(true)} disabled={isAnalyzing} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2 shadow-sm">{isAnalyzing ? <Loader2 className="animate-spin" size={16}/> : <Sparkles size={16}/>} Processar, Vincular e Arquivar</button>
+                     <button type="button" onClick={() => handleUploadAction(false)} disabled={isAnalyzing} className="bg-white border border-indigo-200 text-indigo-700 px-3 py-1.5 rounded text-xs font-medium hover:bg-indigo-50">Anexar sem IA</button>
+                     <button type="button" onClick={() => handleUploadAction(true)} disabled={isAnalyzing} className="bg-indigo-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-indigo-700 flex items-center gap-2 shadow-sm">{isAnalyzing ? <Loader2 className="animate-spin" size={14}/> : <Sparkles size={14}/>} Processar e Preencher</button>
                  </div>
              </div>
           )}
-          {!aiConfig && <p className="text-xs text-red-500 mt-2 text-center">Atenção: Configure a chave de API para usar análise e vinculação automática.</p>}
         </div>
       )}
 
-       <div className="flex flex-col gap-4 mb-6">
-            <div className="flex flex-col md:flex-row gap-4 justify-between items-center">
+       <div className="flex flex-col gap-4 mb-4">
+            <div className="flex flex-col md:flex-row gap-3 justify-between items-center">
                 <div className="relative flex-1 w-full">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                    <ClearableInput type="text" placeholder="Buscar documentos, cláusulas..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} onClear={() => setSearchTerm('')} className="w-full pl-10 pr-8 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 bg-white text-slate-900 shadow-sm"/>
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                    <ClearableInput type="text" placeholder="Buscar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} onClear={() => setSearchTerm('')} className="w-full pl-9 pr-8 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 bg-white text-slate-900 shadow-sm text-sm"/>
                 </div>
-                <div className="flex gap-4">
-                    <button type="button" onClick={() => setFilterFlags(p => ({...p, property: !p.property}))} className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${filterFlags.property ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-slate-200 text-slate-500'}`}>{filterFlags.property ? <CheckSquare size={16}/> : <Square size={16}/>} Imóveis</button>
-                    <button type="button" onClick={() => setFilterFlags(p => ({...p, owner: !p.owner}))} className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${filterFlags.owner ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-slate-200 text-slate-500'}`}>{filterFlags.owner ? <CheckSquare size={16}/> : <Square size={16}/>} Proprietários</button>
-                    <button type="button" onClick={() => setFilterFlags(p => ({...p, general: !p.general}))} className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${filterFlags.general ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-slate-200 text-slate-500'}`}>{filterFlags.general ? <CheckSquare size={16}/> : <Square size={16}/>} Geral</button>
+                
+                {/* Only show toggle filters if NOT embedded (Global View) */}
+                {!isEmbedded && (
+                    <div className="flex gap-2">
+                        <button type="button" onClick={() => setFilterFlags(p => ({...p, property: !p.property}))} className={`flex items-center gap-1 px-2 py-1.5 rounded border text-xs font-medium transition-colors ${filterFlags.property ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-slate-200 text-slate-500'}`}>{filterFlags.property ? <CheckSquare size={14}/> : <Square size={14}/>} Imóveis</button>
+                        <button type="button" onClick={() => setFilterFlags(p => ({...p, owner: !p.owner}))} className={`flex items-center gap-1 px-2 py-1.5 rounded border text-xs font-medium transition-colors ${filterFlags.owner ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-slate-200 text-slate-500'}`}>{filterFlags.owner ? <CheckSquare size={14}/> : <Square size={14}/>} Propriet.</button>
+                        <button type="button" onClick={() => setFilterFlags(p => ({...p, general: !p.general}))} className={`flex items-center gap-1 px-2 py-1.5 rounded border text-xs font-medium transition-colors ${filterFlags.general ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-slate-200 text-slate-500'}`}>{filterFlags.general ? <CheckSquare size={14}/> : <Square size={14}/>} Geral</button>
+                    </div>
+                )}
+
+                <div className="w-40">
+                    <SearchableSelect options={[{ value: 'All', label: 'Todas' }, { value: 'Legal', label: 'Jurídico' }, { value: 'Financial', label: 'Financeiro' }, { value: 'Tax', label: 'Fiscal' }, { value: 'Maintenance', label: 'Manutenção' }, { value: 'Acquisition', label: 'Aquisição' }, { value: 'Personal', label: 'Pessoal' }]} value={selectedCategory} onChange={(val) => setSelectedCategory(val as any)} placeholder="Categoria" />
                 </div>
-            </div>
-            <div className="flex justify-end w-48 ml-auto">
-                <SearchableSelect options={[{ value: 'All', label: 'Todas Categorias' }, { value: 'Legal', label: 'Jurídico' }, { value: 'Financial', label: 'Financeiro' }, { value: 'Tax', label: 'Fiscal' }, { value: 'Maintenance', label: 'Manutenção' }, { value: 'Acquisition', label: 'Aquisição' }, { value: 'Personal', label: 'Pessoal' }]} value={selectedCategory} onChange={(val) => setSelectedCategory(val as any)} placeholder="Categoria" />
             </div>
        </div>
 
        {/* BATCH ACTIONS HEADER */}
-       <div className="flex items-center justify-between bg-slate-100 p-3 rounded-t-xl border-b border-slate-200">
-           <div className="flex items-center gap-3">
+       <div className={`flex items-center justify-between bg-slate-100 p-2 rounded-t-xl border-b border-slate-200 ${isEmbedded ? 'text-xs' : 'text-sm'}`}>
+           <div className="flex items-center gap-2">
                <button onClick={toggleSelectAll} className="text-slate-500 hover:text-indigo-600">
-                   {selectedDocIds.length > 0 && selectedDocIds.length === filteredDocs.length ? <CheckSquare size={20}/> : <Square size={20}/>}
+                   {selectedDocIds.length > 0 && selectedDocIds.length === filteredDocs.length ? <CheckSquare size={18}/> : <Square size={18}/>}
                </button>
-               <span className="text-sm font-medium text-slate-600">{selectedDocIds.length} selecionados</span>
+               <span className="font-medium text-slate-600">{selectedDocIds.length} selecionados</span>
            </div>
            {selectedDocIds.length > 0 && (
                <div className="flex gap-2">
-                   <div className="group relative">
-                       <button className="bg-white border border-slate-300 text-slate-700 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-slate-50 flex items-center gap-2">
-                           <Download size={16}/> Baixar <ChevronDown size={14}/>
-                       </button>
-                       <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg hidden group-hover:block w-48 z-10">
-                           <button onClick={() => handleBatchDownload(false)} className="block w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-indigo-50">Individualmente</button>
-                           <button onClick={() => handleBatchDownload(true)} className="block w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-indigo-50">Combinar em um PDF</button>
-                       </div>
-                   </div>
-                   <button onClick={handleBatchDelete} className="bg-white border border-red-200 text-red-600 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-red-50 flex items-center gap-2">
-                       <Trash2 size={16}/> Excluir
+                   <button onClick={() => handleBatchDownload(false)} className="bg-white border border-slate-300 text-slate-700 px-2 py-1 rounded text-xs font-medium hover:bg-slate-50 flex items-center gap-1">
+                       <Download size={14}/> Baixar
+                   </button>
+                   <button onClick={handleBatchDelete} className="bg-white border border-red-200 text-red-600 px-2 py-1 rounded text-xs font-medium hover:bg-red-50 flex items-center gap-1">
+                       <Trash2 size={14}/> Excluir
                    </button>
                </div>
            )}
        </div>
 
-       {/* DOCUMENT LIST (Unified Format) */}
-       <div className="bg-white border border-slate-200 rounded-b-xl overflow-hidden divide-y divide-slate-100">
+       {/* DOCUMENT LIST */}
+       <div className="bg-white border border-slate-200 rounded-b-xl overflow-hidden divide-y divide-slate-100 flex-1 overflow-y-auto">
         {filteredDocs.map((doc) => {
-             const relatedProperty = properties.find(p => p.id === doc.relatedPropertyId);
-             const relatedOwner = owners.find(o => o.id === doc.relatedOwnerId);
-             const hasAI = doc.aiAnalysis && doc.extractedData;
+             const relatedProperty = !preSelectedPropertyId ? properties.find(p => p.id === doc.relatedPropertyId) : null;
+             const relatedOwner = !preSelectedOwnerId ? owners.find(o => o.id === doc.relatedOwnerId) : null;
              const isSelected = selectedDocIds.includes(doc.id);
 
              return (
-                 <div key={doc.id} className={`p-4 flex items-center gap-4 hover:bg-slate-50 transition-colors group ${isSelected ? 'bg-indigo-50/30' : ''}`}>
-                      {/* Checkbox */}
+                 <div key={doc.id} className={`p-3 flex items-center gap-3 hover:bg-slate-50 transition-colors group ${isSelected ? 'bg-indigo-50/30' : ''}`}>
                       <button onClick={() => toggleSelectOne(doc.id)} className="text-slate-400 hover:text-indigo-600 shrink-0">
-                          {isSelected ? <CheckSquare size={20} className="text-indigo-600"/> : <Square size={20}/>}
+                          {isSelected ? <CheckSquare size={18} className="text-indigo-600"/> : <Square size={18}/>}
                       </button>
 
-                      {/* Icon */}
-                      <div className={`p-3 rounded-lg text-slate-600 shrink-0 ${doc.category === 'Tax' ? 'bg-red-50 text-red-600' : 'bg-slate-100'}`}><FileText size={20} /></div>
+                      <div className={`p-2 rounded-lg text-slate-600 shrink-0 ${doc.category === 'Tax' ? 'bg-red-50 text-red-600' : 'bg-slate-100'}`}><FileText size={18} /></div>
                       
-                      {/* Info */}
                       <div className="flex-1 min-w-0">
-                          <h4 className="font-semibold text-slate-900 text-base truncate">{doc.name}</h4>
-                          <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 mt-1">
-                              <span className="flex items-center gap-1"><Calendar size={12}/> {doc.uploadDate}</span>
-                              {relatedProperty && <span className="flex items-center gap-1 bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-100"><Building size={10} /> {relatedProperty.name}</span>}
-                              {relatedOwner && <span className="flex items-center gap-1 bg-green-50 text-green-700 px-1.5 py-0.5 rounded border border-green-100"><User size={10} /> {relatedOwner.name}</span>}
+                          <h4 className="font-semibold text-slate-900 text-sm truncate">{doc.name}</h4>
+                          <div className="flex flex-wrap items-center gap-2 text-[10px] text-slate-500 mt-0.5">
+                              <span className="flex items-center gap-1"><Calendar size={10}/> {doc.uploadDate}</span>
+                              {relatedProperty && <span className="flex items-center gap-1 bg-blue-50 text-blue-700 px-1 py-0.5 rounded border border-blue-100"><Building size={10} /> {relatedProperty.name}</span>}
+                              {relatedOwner && <span className="flex items-center gap-1 bg-green-50 text-green-700 px-1 py-0.5 rounded border border-green-100"><User size={10} /> {relatedOwner.name}</span>}
                               <span className={`px-1.5 py-0.5 rounded border ${doc.category === 'Legal' ? 'bg-purple-50 text-purple-700 border-purple-100' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>{doc.category}</span>
                           </div>
                       </div>
 
-                      {/* ACTIONS (Right to Left: AI, Form, View, Download, Delete) */}
                       <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                          
-                          {/* AI / Form Button */}
-                          <button 
-                            onClick={() => {
-                                if (doc.extractedData) setEditingDataDoc(doc);
-                                else handleRunAI(doc);
-                            }}
-                            className={`p-2 rounded transition-colors relative ${doc.extractedData ? 'text-indigo-600 hover:bg-indigo-50' : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'}`}
-                            title={doc.extractedData ? "Ver Dados Extraídos" : "Analisar com IA"}
-                          >
-                              {doc.extractedData ? <FileSpreadsheet size={18} /> : <Sparkles size={18} />}
-                              {!doc.extractedData && <span className="absolute top-0 right-0 w-2 h-2 bg-indigo-500 rounded-full border border-white"></span>}
-                          </button>
-
-                          {/* View */}
-                          <button onClick={() => setViewingDoc(doc)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors" title="Visualizar">
-                              <Eye size={18} />
-                          </button>
-
-                          {/* Download */}
-                          <button onClick={() => handleDownload(doc)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors" title="Download">
-                              <Download size={18} />
-                          </button>
-
-                          {/* Delete */}
-                          <button onClick={() => { if(confirm(`Excluir ${doc.name}?`)) onDeleteDocument(doc.id); }} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors" title="Excluir">
-                              <Trash2 size={18} />
-                          </button>
+                          <button onClick={() => { if (doc.extractedData) setEditingDataDoc(doc); else handleRunAI(doc); }} className={`p-1.5 rounded transition-colors ${doc.extractedData ? 'text-indigo-600 hover:bg-indigo-50' : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'}`} title={doc.extractedData ? "Dados Extraídos" : "Analisar com IA"}>{doc.extractedData ? <FileSpreadsheet size={16} /> : <Sparkles size={16} />}</button>
+                          <button onClick={() => setViewingDoc(doc)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded" title="Visualizar"><Eye size={16} /></button>
+                          <button onClick={() => handleDownload(doc)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded" title="Download"><Download size={16} /></button>
+                          <button onClick={() => { if(confirm(`Excluir ${doc.name}?`)) onDeleteDocument(doc.id); }} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded" title="Excluir"><Trash2 size={16} /></button>
                       </div>
                  </div>
              );
         })}
-        {filteredDocs.length === 0 && <div className="p-8 text-center text-slate-400 italic">Nenhum documento encontrado.</div>}
+        {filteredDocs.length === 0 && <div className="p-8 text-center text-slate-400 italic text-sm">Nenhum documento encontrado.</div>}
        </div>
 
-       {/* Viewing Modal */}
        {viewingDoc && (
-        <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 bg-black/60 z-[70] flex items-center justify-center p-4 animate-in fade-in duration-200">
            <div className="bg-white rounded-xl w-full max-w-6xl h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95">
               <div className="flex justify-between items-center p-4 border-b border-slate-200 bg-slate-50 shrink-0">
                  <div className="flex items-center gap-3"><div className="bg-indigo-100 p-2 rounded text-indigo-600"><FileText size={24}/></div><div><h3 className="text-lg font-bold text-slate-800">{viewingDoc.name}</h3><p className="text-xs text-slate-500">{viewingDoc.category} • {viewingDoc.uploadDate}</p></div></div>
@@ -520,7 +545,6 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({ documents, properties, ow
         </div>
       )}
 
-      {/* Editing Data Modal */}
       {editingDataDoc && (
           <DocumentDataModal 
             doc={editingDataDoc} 
