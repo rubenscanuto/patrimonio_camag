@@ -688,6 +688,23 @@ const AssetManager: React.FC<AssetManagerProps> = ({
       setShowOwnerModal(true);
   };
 
+  const handleFillPropertyDataFromAI = (extractedData: any) => {
+    if (!extractedData) return;
+
+    setNewProp(prev => {
+      const updated: Partial<Property> = { ...prev };
+
+      if (extractedData.name && !prev.name) updated.name = extractedData.name;
+      if (extractedData.address && !prev.address) updated.address = extractedData.address;
+      if (extractedData.value && extractedData.value > 0 && !prev.value) updated.value = extractedData.value;
+      if (extractedData.purchaseValue && extractedData.purchaseValue > 0 && !prev.purchaseValue) updated.purchaseValue = extractedData.purchaseValue;
+      if (extractedData.purchaseDate && !prev.purchaseDate) updated.purchaseDate = extractedData.purchaseDate;
+      if (extractedData.seller && !prev.seller) updated.seller = extractedData.seller;
+
+      return updated;
+    });
+  };
+
   // ... (Custom Field logic same)
   const handleAddCustomField = () => {
     if (!tempCustomFieldKey || !tempCustomFieldValue) return;
@@ -1536,6 +1553,7 @@ const AssetManager: React.FC<AssetManagerProps> = ({
                       onEditDocument={onEditDocument}
                       onDeleteDocument={onDeleteDocument}
                       aiConfig={aiConfig}
+                      onFillPropertyData={handleFillPropertyDataFromAI}
                     />
                   )}
                 </div>

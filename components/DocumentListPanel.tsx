@@ -11,6 +11,8 @@ interface DocumentListPanelProps {
   onEditDocument: (doc: Document) => void;
   onDeleteDocument: (id: string) => void;
   aiConfig?: AIConfig;
+  onFillPropertyData?: (data: any) => void;
+  onFillOwnerData?: (data: any) => void;
 }
 
 const DocumentListPanel: React.FC<DocumentListPanelProps> = ({
@@ -21,6 +23,8 @@ const DocumentListPanel: React.FC<DocumentListPanelProps> = ({
   onEditDocument,
   onDeleteDocument,
   aiConfig,
+  onFillPropertyData,
+  onFillOwnerData,
 }) => {
   const [selectedDocs, setSelectedDocs] = useState<Set<string>>(new Set());
   const [viewingDoc, setViewingDoc] = useState<Document | null>(null);
@@ -116,10 +120,11 @@ const DocumentListPanel: React.FC<DocumentListPanelProps> = ({
         if (aiConfig) {
           setIsAnalyzing(true);
           try {
+            const analysisType = relatedPropertyId ? 'PropertyCreation' : relatedOwnerId ? 'OwnerCreation' : 'General';
             const analysis = await analyzeDocumentContent(
               content,
               aiConfig.apiKey,
-              'General',
+              analysisType,
               aiConfig.provider,
               aiConfig.modelName
             );
@@ -130,6 +135,14 @@ const DocumentListPanel: React.FC<DocumentListPanelProps> = ({
               keyDates: analysis.keyDates,
               monetaryValues: analysis.monetaryValues,
             };
+
+            if (analysisType === 'PropertyCreation' && analysis.extractedPropertyData && onFillPropertyData) {
+              onFillPropertyData(analysis.extractedPropertyData);
+            }
+
+            if (analysisType === 'OwnerCreation' && analysis.extractedOwnerData && onFillOwnerData) {
+              onFillOwnerData(analysis.extractedOwnerData);
+            }
           } catch (error) {
             console.error('Erro ao analisar documento:', error);
           } finally {

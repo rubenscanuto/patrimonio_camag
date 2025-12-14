@@ -256,6 +256,7 @@ const RegistersView: React.FC<RegistersViewProps> = (props) => {
   const isPJ = (document?: string) => { const clean = document?.replace(/\D/g, '') || ''; return clean.length > 11; };
   const handleDeleteWithConfirm = (deleteFn: (id: string) => void, id: string, name: string, typeLabel: string = 'item') => { if (confirm(`Tem certeza que deseja excluir o ${typeLabel} "${name}"? Esta ação não pode ser desfeita.`)) { deleteFn(id); } };
   const handleDocumentChange = (e: React.ChangeEvent<HTMLInputElement>) => { const val = formatDocumentMask(e.target.value); setNewOwner({ ...newOwner, document: val }); };
+  const handleFillOwnerDataFromAI = (extractedData: any) => { if (!extractedData) return; setNewOwner(prev => { const updated: Partial<Owner> = { ...prev }; if (extractedData.name && !prev.name) updated.name = extractedData.name; if (extractedData.email && !prev.email) updated.email = extractedData.email; if (extractedData.phone && !prev.phone) updated.phone = extractedData.phone; if (extractedData.document && !prev.document) updated.document = formatDocumentMask(extractedData.document); if (extractedData.address && !prev.address) updated.address = extractedData.address; return updated; }); };
   
   const handleFetchCNPJ = async (e?: any) => {
       const isManual = e?.type === 'click' || e?.key === 'Enter';
@@ -1044,6 +1045,7 @@ const RegistersView: React.FC<RegistersViewProps> = (props) => {
                                           onEditDocument={props.onEditDocument}
                                           onDeleteDocument={props.onDeleteDocument}
                                           aiConfig={props.activeAIConfig}
+                                          onFillOwnerData={handleFillOwnerDataFromAI}
                                         />
                                     )}
                                 </div>
