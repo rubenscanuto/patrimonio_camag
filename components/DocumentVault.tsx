@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Document, DocumentCategory, Property, AIConfig, Owner, SummaryEditHistory } from '../types';
 import { FileText, Upload, Search, Tag, AlertTriangle, Calendar, DollarSign, Loader2, Filter, User, Building, CheckSquare, Square, Trash2, Eye, X, Download, Save, Sparkles, Eraser, Cloud, ChevronDown, CheckCircle, Link, ExternalLink, Undo, Edit3 } from 'lucide-react';
 import { analyzeDocumentContent } from '../services/geminiService';
+import { processDocumentForUpload } from '../services/documentProcessor';
 import { extractTextFromPDF, isPDF } from '../services/pdfService';
 import { getNextId } from '../services/idService';
 

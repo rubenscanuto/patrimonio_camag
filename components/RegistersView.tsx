@@ -6,6 +6,7 @@ import TagManagerView from './TagManagerView';
 import SettingsView from './SettingsView';
 import DocumentListPanel from './DocumentListPanel';
 import { analyzeDocumentContent } from '../services/geminiService';
+import { processDocumentForUpload } from '../services/documentProcessor';
 import { extractTextFromPDF, isPDF } from '../services/pdfService';
 import { Database, Users, Building2, Tag, Key, User, Plus, Trash2, Save, Cloud, ShieldCheck, Loader2, Search, MapPin, FileText, Download, Sparkles, ChevronDown, Camera, X, Briefcase, HelpCircle, Power, PowerOff, RefreshCcw, Eraser, Pencil, ExternalLink, CheckCircle, Lock, Image as ImageIcon } from 'lucide-react';
 import { getNextId } from '../services/idService';

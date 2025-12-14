@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Document, AIConfig } from '../types';
 import { FileText, Eye, Download, Trash2, Sparkles, Upload, CheckSquare, Square, X, Save, AlertTriangle, Calendar, ChevronDown, Info } from 'lucide-react';
 import { analyzeDocumentContent } from '../services/geminiService';
-import { extractTextFromPDF, isPDF } from '../services/pdfService';
+import { processDocumentForUpload } from '../services/documentProcessor';
 
 interface DocumentListPanelProps {
   documents: Document[];
@@ -94,12 +94,16 @@ const DocumentListPanel: React.FC<DocumentListPanelProps> = ({
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      const reader = new FileReader();
+    setIsAnalyzing(true);
 
-      reader.onload = async (event) => {
-        const content = event.target?.result as string;
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+
+        console.log(`Processando arquivo: ${file.name}`);
+
+        // Processar o documento (PDF, imagem ou texto) com OCR/extração
+        const processed = await processDocumentForUpload(file);
 
         const newDoc: Document = {
           id: `D_${Date.now()}_${i}`,
@@ -110,7 +114,7 @@ const DocumentListPanel: React.FC<DocumentListPanelProps> = ({
           summaryHistory: [],
           relatedPropertyId: relatedPropertyId || '',
           relatedOwnerId: relatedOwnerId || '',
-          contentRaw: content,
+          contentRaw: processed.originalDataUrl, // Salvar o arquivo original/otimizado
           aiAnalysis: {
             keyDates: [],
             riskLevel: 'Low',
@@ -118,24 +122,12 @@ const DocumentListPanel: React.FC<DocumentListPanelProps> = ({
           },
         };
 
-        if (aiConfig) {
-          setIsAnalyzing(true);
+        if (aiConfig && processed.extractedText) {
           try {
-            let textForAnalysis = content;
-
-            if (isPDF(file.name)) {
-              try {
-                textForAnalysis = await extractTextFromPDF(content);
-                console.log('Texto extraído do PDF:', textForAnalysis.substring(0, 200));
-              } catch (pdfError) {
-                console.error('Erro ao extrair texto do PDF:', pdfError);
-                textForAnalysis = 'Documento PDF anexado. Não foi possível extrair texto automaticamente.';
-              }
-            }
-
+            console.log('Enviando texto extraído para análise de IA...');
             const analysisType = relatedPropertyId ? 'PropertyCreation' : relatedOwnerId ? 'OwnerCreation' : 'General';
             const analysis = await analyzeDocumentContent(
-              textForAnalysis,
+              processed.extractedText,
               aiConfig.apiKey,
               analysisType,
               aiConfig.provider,
@@ -158,19 +150,19 @@ const DocumentListPanel: React.FC<DocumentListPanelProps> = ({
             }
           } catch (error) {
             console.error('Erro ao analisar documento:', error);
-          } finally {
-            setIsAnalyzing(false);
           }
         }
 
         onAddDocument(newDoc);
-      };
-
-      reader.readAsDataURL(file);
-    }
-
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+      }
+    } catch (error) {
+      console.error('Erro ao processar arquivo:', error);
+      alert('Erro ao processar arquivo. Por favor, tente novamente.');
+    } finally {
+      setIsAnalyzing(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 
