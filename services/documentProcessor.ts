@@ -1,4 +1,3 @@
-import Tesseract from 'tesseract.js';
 import { extractTextFromPDF, isPDF } from './pdfService';
 
 export interface ProcessedDocument {
@@ -26,8 +25,8 @@ function isTextFile(fileName: string, fileType: string): boolean {
 }
 
 /**
- * Processa um arquivo de imagem/PDF para otimização e OCR.
- * Aplica: Redimensionamento (150DPI), Escala de Cinza, Conversão WebP e OCR.
+ * Processa um arquivo de imagem para otimização.
+ * Aplica: Redimensionamento (150DPI), Escala de Cinza, Conversão WebP.
  */
 export async function processImageForUpload(file: File, dataUrl: string): Promise<ProcessedDocument> {
   return new Promise((resolve, reject) => {
@@ -54,8 +53,7 @@ export async function processImageForUpload(file: File, dataUrl: string): Promis
       canvas.height = targetHeight;
 
       // 2. APLICAR ESCALA DE CINZA (Grayscale)
-      // Isso remove a informação de cor antes mesmo de desenhar, reduzindo ruído para o OCR
-      ctx.filter = 'grayscale(100%) contrast(1.2)'; // Contraste extra ajuda no OCR
+      ctx.filter = 'grayscale(100%) contrast(1.2)';
 
       // Desenha a imagem redimensionada no canvas
       ctx.drawImage(img, 0, 0, TARGET_WIDTH, targetHeight);
@@ -68,27 +66,18 @@ export async function processImageForUpload(file: File, dataUrl: string): Promis
           return;
         }
 
-        // Criar URL para visualização/OCR
+        // Criar URL para visualização
         const optimizedImageUrl = URL.createObjectURL(blob);
 
         try {
-          // 4. EXECUTAR OCR (Estratégia de Tokens)
-          // Extraímos o texto AQUI para não gastar tokens de visão da IA depois
-          console.log('Iniciando OCR...');
-          const { data: { text } } = await Tesseract.recognize(
-            optimizedImageUrl,
-            'por', // Português
-            { logger: m => console.log('OCR:', m.status) }
-          );
-
-          console.log('OCR concluído. Texto extraído:', text.substring(0, 200));
+          console.log('Imagem otimizada com sucesso');
 
           // Converter blob WebP para dataURL para salvar no banco
           const reader = new FileReader();
           reader.onloadend = () => {
             resolve({
               imageBlob: blob,
-              extractedText: text,
+              extractedText: `Arquivo de imagem: ${file.name}\nTipo: ${file.type}\n\nImagem anexada. Analise o conteúdo visualmente.`,
               previewUrl: optimizedImageUrl,
               originalDataUrl: reader.result as string,
               fileType: 'image'
@@ -97,11 +86,11 @@ export async function processImageForUpload(file: File, dataUrl: string): Promis
           reader.readAsDataURL(blob);
 
         } catch (error) {
-          console.error('Erro no OCR:', error);
+          console.error('Erro ao processar imagem:', error);
           reject(error);
         }
 
-      }, 'image/webp', 0.8); // Formato WebP com 80% de qualidade
+      }, 'image/webp', 0.8);
     };
 
     img.onerror = () => {
