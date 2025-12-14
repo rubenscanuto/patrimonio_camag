@@ -33,15 +33,21 @@ const GoogleIcon = ({ size = 16 }: { size?: number }) => (
 );
 
 const OpenAIIcon = ({ size = 16 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-    <path d="M22.2819 9.82116C22.1838 9.10662 21.8708 8.42398 21.3934 7.86311C20.9161 7.30225 20.3013 6.88448 19.6053 6.66669L19.5398 6.64322L19.507 6.58694C19.1622 5.9224 18.6627 5.34293 18.0475 4.88766C17.4322 4.4324 16.716 4.1135 15.9613 3.95369C15.2066 3.79387 14.4327 3.79796 13.6787 3.96576C12.9247 4.13356 12.2131 4.46366 11.597 4.93175L11.5362 4.98332L11.4518 4.96222C10.7431 4.80993 10.013 4.83339 9.31464 5.03083C8.61633 5.22827 7.96919 5.59392 7.421 6.10025C6.8728 6.60657 6.43851 7.23921 6.15177 7.94977C5.86503 8.66033 5.73373 9.42878 5.7679 10.1969V10.279L5.69759 10.3259C5.03305 10.7135 4.47036 11.2616 4.0772 11.9317C3.68404 12.6019 3.47229 13.3764 3.46191 14.1509C3.46191 15.7552 4.1209 17.2069 5.17615 18.2387L5.34025 18.3934L4.99318 20.3912L6.99327 20.0464L7.14799 20.2105C8.1798 21.2657 9.63152 21.9247 11.2359 21.9247C11.9504 21.8266 12.6331 21.5136 13.1939 21.0362C13.7548 20.5589 14.1726 19.9441 14.3904 19.2481L14.4559 19.2246L14.4887 19.2809C14.8335 19.9454 15.333 20.5249 15.9482 20.9802C16.5635 21.4354 17.2797 21.7543 18.0344 21.9141C18.7891 22.0739 19.563 22.0698 20.317 21.902C21.071 21.7342 21.7826 21.4042 22.3987 20.9361L22.4596 20.8845L22.5439 20.9056C23.2526 21.0579 23.9827 21.0344 24.6811 20.837C25.3794 20.6395 26.0265 20.2739 26.5747 19.7676C27.1229 19.2612 27.5572 18.6286 27.8439 17.918C28.1307 17.2075 28.262 16.439 28.2278 15.6709V15.5888L28.2981 15.5419C28.9627 15.1543 29.5254 14.6062 29.9185 13.9361C30.3117 13.266 30.5234 12.4914 30.5338 11.7169C30.5338 10.1126 29.8748 8.66092 28.8196 7.62912L28.6555 7.47443L29.0025 5.47661L27.0025 5.82138L26.8477 5.6573C25.8159 4.60205 24.3642 3.94306 22.7598 3.94306C22.0453 4.04118 21.3626 4.35418 20.8018 4.83155C20.241 5.30892 19.8231 5.92369 19.6053 6.61975" transform="scale(0.7) translate(1,1)" />
+  <svg width={size} height={size} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z" fill="#10A37F"/>
   </svg>
 );
 
 const AnthropicIcon = ({ size = 16 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-    <path d="M18.6667 3L23.3333 13.5H19.5L18.5 11H13.5L12.5 13.5H8.66667L13.3333 3H18.6667ZM16.8 7.5L16 9.3H14.4L13.6 7.5H16.8Z" />
-    <path d="M12 21L7.33333 10.5H3.5L8.16667 21H12Z" />
+  <svg width={size} height={size} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="anthropic-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" style={{stopColor: '#CC785C', stopOpacity: 1}} />
+        <stop offset="100%" style={{stopColor: '#B8613E', stopOpacity: 1}} />
+      </linearGradient>
+    </defs>
+    <path d="M18.6667 3L23.3333 13.5H19.5L18.5 11H13.5L12.5 13.5H8.66667L13.3333 3H18.6667ZM16.8 7.5L16 9.3H14.4L13.6 7.5H16.8Z" fill="url(#anthropic-gradient)" />
+    <path d="M12 21L7.33333 10.5H3.5L8.16667 21H12Z" fill="url(#anthropic-gradient)" />
   </svg>
 );
 
@@ -607,14 +613,24 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       } 
   };
   const getEmailSuggestion = () => { if (!newCloudEmail || newCloudEmail.includes('@')) return null; const domain = EMAIL_DOMAINS[newCloudProvider]; if (!domain) return null; return ( <button type="button" onClick={() => setNewCloudEmail((newCloudEmail + domain).toLowerCase())} className="text-xs text-indigo-600 hover:underline mt-1 block text-left"> Completar com {domain} </button> ); };
-  const getProviderIcon = (providerName: string) => { 
-      if (providerName.includes('Drive')) return <GoogleDriveLogo size={20} />; 
-      if (providerName.includes('OneDrive')) return <OneDriveLogo size={20} />; 
-      if (providerName.includes('Dropbox')) return <DropboxLogo size={20} />; 
+  const getProviderIcon = (providerName: string) => {
+      if (providerName.includes('Drive')) return <GoogleDriveLogo size={20} />;
+      if (providerName.includes('OneDrive')) return <OneDriveLogo size={20} />;
+      if (providerName.includes('Dropbox')) return <DropboxLogo size={20} />;
       if (providerName.includes('AWS') || providerName.includes('S3')) return <AWSLogo size={20} />;
       if (providerName.includes('Box')) return <BoxLogo size={20} />;
       if (providerName.includes('iCloud')) return <Cloud size={20} className="text-blue-400" />;
-      return <Cloud size={20} className="text-slate-400" />; 
+      return <Cloud size={20} className="text-slate-400" />;
+  };
+
+  const getProviderUrl = (providerName: string) => {
+      if (providerName.includes('Drive')) return 'https://drive.google.com/';
+      if (providerName.includes('OneDrive')) return 'https://onedrive.live.com/';
+      if (providerName.includes('Dropbox')) return 'https://www.dropbox.com/home';
+      if (providerName.includes('AWS') || providerName.includes('S3')) return 'https://s3.console.aws.amazon.com/';
+      if (providerName.includes('Box')) return 'https://app.box.com/';
+      if (providerName.includes('iCloud')) return 'https://www.icloud.com/iclouddrive/';
+      return null;
   };
 
   const getModelOptions = () => {
@@ -1076,7 +1092,13 @@ const SettingsView: React.FC<SettingsViewProps> = ({
                            <div className="divide-y divide-slate-100">
                                {cloudAccounts.map(account => (
                                    <div key={account.id} className={`p-4 flex items-center justify-between transition-colors hover:bg-slate-50 ${account.isConnected ? 'bg-indigo-50/30' : ''}`}>
-                                       <div className="flex items-center gap-4">
+                                       <div
+                                         className="flex items-center gap-4 flex-1 cursor-pointer"
+                                         onClick={() => {
+                                           const url = getProviderUrl(account.provider);
+                                           if (url) window.open(url, '_blank');
+                                         }}
+                                       >
                                             <div className="w-10 h-10 flex items-center justify-center bg-white rounded-lg border border-slate-100 shadow-sm">
                                                 {getProviderIcon(account.provider)}
                                             </div>

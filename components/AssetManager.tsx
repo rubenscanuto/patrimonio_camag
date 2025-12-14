@@ -933,16 +933,8 @@ const AssetManager: React.FC<AssetManagerProps> = ({
                className="border-red-500"
              />
           </div>
-          
-          <button 
-            type="button"
-            onClick={() => setShowDriveModal(true)}
-            className="bg-white border border-red-500 text-slate-700 hover:bg-slate-50 px-3 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-2"
-          >
-            <Cloud size={18} className="text-blue-500" />
-            <span className="hidden md:inline">Importar</span>
-          </button>
-          <button 
+
+          <button
             type="button"
             onClick={openAddModal}
             className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-2"
