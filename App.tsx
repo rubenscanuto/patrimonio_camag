@@ -158,32 +158,48 @@ const App: React.FC = () => {
   const activeAIConfig = aiConfigs.find(c => c.isActive);
 
   useEffect(() => {
-    checkAuth();
+    let mounted = true;
 
     const loadingTimeout = setTimeout(() => {
-      console.warn('Loading timeout reached, forcing loading to false');
-      setLoading(false);
-    }, 10000);
+      console.warn('[App] Loading timeout reached, forcing loading to false');
+      if (mounted) setLoading(false);
+    }, 15000);
 
     const subscription = authService.onAuthStateChange(async (authUser) => {
-      console.log('Auth state changed:', authUser?.id || 'logged out');
+      console.log('[App] Auth state changed:', authUser?.id || 'logged out');
+
+      if (!mounted) return;
+
       setUser(authUser);
+
       if (authUser) {
         try {
-          await loadUserData(authUser.id);
+          console.log('[App] Aguardando 500ms para garantir sessão estabelecida...');
+          await new Promise(resolve => setTimeout(resolve, 500));
+
+          if (mounted) {
+            await loadUserData(authUser.id);
+          }
         } catch (error) {
-          console.error('Error in auth state change handler:', error);
+          console.error('[App] Erro no handler de mudança de auth:', error);
         } finally {
+          if (mounted) {
+            setLoading(false);
+            clearTimeout(loadingTimeout);
+          }
+        }
+      } else {
+        if (mounted) {
           setLoading(false);
           clearTimeout(loadingTimeout);
         }
-      } else {
-        setLoading(false);
-        clearTimeout(loadingTimeout);
       }
     });
 
+    checkAuth();
+
     return () => {
+      mounted = false;
       subscription.unsubscribe();
       clearTimeout(loadingTimeout);
     };
@@ -195,15 +211,14 @@ const App: React.FC = () => {
       const currentUser = await authService.getCurrentUser();
 
       if (currentUser) {
-        console.log('[checkAuth] Usuário autenticado encontrado:', currentUser.id);
-        setUser(currentUser);
-        await loadUserData(currentUser.id);
+        console.log('[checkAuth] Usuário já autenticado encontrado:', currentUser.id);
+        console.log('[checkAuth] onAuthStateChange irá carregar os dados...');
       } else {
-        console.log('[checkAuth] Nenhum usuário autenticado');
+        console.log('[checkAuth] Nenhum usuário autenticado, mostrando tela de login');
+        setLoading(false);
       }
     } catch (error) {
       console.error('[checkAuth] Erro ao verificar autenticação:', error);
-    } finally {
       setLoading(false);
     }
   };
