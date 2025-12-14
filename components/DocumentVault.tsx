@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Document, DocumentCategory, Property, AIConfig, Owner, SummaryEditHistory } from '../types';
 import { FileText, Upload, Search, Tag, AlertTriangle, Calendar, DollarSign, Loader2, Filter, User, Building, CheckSquare, Square, Trash2, Eye, X, Download, Save, Sparkles, Eraser, Cloud, ChevronDown, CheckCircle, Link, ExternalLink, Undo, Edit3 } from 'lucide-react';
 import { analyzeDocumentContent } from '../services/geminiService';
+import { extractTextFromPDF, isPDF } from '../services/pdfService';
 import { getNextId } from '../services/idService';
 
 interface DocumentVaultProps {
@@ -224,7 +225,19 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({ documents, properties, ow
 
                 if (doc.content.startsWith('data:')) {
                     console.log('Arquivo detectado como binário (PDF/Imagem)');
-                    textToAnalyze = `Arquivo: ${doc.name}\nTipo: ${doc.fileObject.type}\n\nEste é um arquivo binário (PDF ou imagem). Analise com base no nome do arquivo e tipo.`;
+
+                    if (isPDF(doc.name)) {
+                        try {
+                            console.log('Extraindo texto do PDF...');
+                            textToAnalyze = await extractTextFromPDF(doc.content);
+                            console.log('Texto extraído do PDF:', textToAnalyze.substring(0, 200));
+                        } catch (pdfError) {
+                            console.error('Erro ao extrair texto do PDF:', pdfError);
+                            textToAnalyze = `Arquivo PDF: ${doc.name}\n\nNão foi possível extrair texto automaticamente. Documento anexado para referência.`;
+                        }
+                    } else {
+                        textToAnalyze = `Arquivo: ${doc.name}\nTipo: ${doc.fileObject.type}\n\nEste é um arquivo binário (imagem). Analise com base no nome do arquivo e tipo.`;
+                    }
                 } else {
                     console.log(`Texto extraído (${doc.content.length} caracteres)`);
                 }
@@ -409,7 +422,18 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({ documents, properties, ow
       let textToAnalyze = doc.contentRaw || '';
 
       if (textToAnalyze.startsWith('data:')) {
-        textToAnalyze = `Arquivo: ${doc.name}\nTipo: ${doc.name.toLowerCase().endsWith('.pdf') ? 'PDF' : 'Imagem'}\n\nAnalise este documento e extraia todas as informações relevantes.`;
+        if (isPDF(doc.name)) {
+          try {
+            console.log('Extraindo texto do PDF para reanálise...');
+            textToAnalyze = await extractTextFromPDF(textToAnalyze);
+            console.log('Texto extraído do PDF:', textToAnalyze.substring(0, 200));
+          } catch (pdfError) {
+            console.error('Erro ao extrair texto do PDF:', pdfError);
+            textToAnalyze = `Arquivo PDF: ${doc.name}\n\nAnalise este documento e extraia todas as informações relevantes.`;
+          }
+        } else {
+          textToAnalyze = `Arquivo: ${doc.name}\nTipo: Imagem\n\nAnalise este documento e extraia todas as informações relevantes.`;
+        }
       }
 
       const analysis = await analyzeDocumentContent(

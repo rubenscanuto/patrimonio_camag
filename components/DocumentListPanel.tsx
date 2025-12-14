@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Document, AIConfig } from '../types';
 import { FileText, Eye, Download, Trash2, Sparkles, Upload, CheckSquare, Square, X, Save, AlertTriangle, Calendar, ChevronDown, Info } from 'lucide-react';
 import { analyzeDocumentContent } from '../services/geminiService';
+import { extractTextFromPDF, isPDF } from '../services/pdfService';
 
 interface DocumentListPanelProps {
   documents: Document[];
@@ -120,9 +121,21 @@ const DocumentListPanel: React.FC<DocumentListPanelProps> = ({
         if (aiConfig) {
           setIsAnalyzing(true);
           try {
+            let textForAnalysis = content;
+
+            if (isPDF(file.name)) {
+              try {
+                textForAnalysis = await extractTextFromPDF(content);
+                console.log('Texto extraído do PDF:', textForAnalysis.substring(0, 200));
+              } catch (pdfError) {
+                console.error('Erro ao extrair texto do PDF:', pdfError);
+                textForAnalysis = 'Documento PDF anexado. Não foi possível extrair texto automaticamente.';
+              }
+            }
+
             const analysisType = relatedPropertyId ? 'PropertyCreation' : relatedOwnerId ? 'OwnerCreation' : 'General';
             const analysis = await analyzeDocumentContent(
-              content,
+              textForAnalysis,
               aiConfig.apiKey,
               analysisType,
               aiConfig.provider,

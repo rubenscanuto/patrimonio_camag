@@ -6,6 +6,7 @@ import TagManagerView from './TagManagerView';
 import SettingsView from './SettingsView';
 import DocumentListPanel from './DocumentListPanel';
 import { analyzeDocumentContent } from '../services/geminiService';
+import { extractTextFromPDF, isPDF } from '../services/pdfService';
 import { Database, Users, Building2, Tag, Key, User, Plus, Trash2, Save, Cloud, ShieldCheck, Loader2, Search, MapPin, FileText, Download, Sparkles, ChevronDown, Camera, X, Briefcase, HelpCircle, Power, PowerOff, RefreshCcw, Eraser, Pencil, ExternalLink, CheckCircle, Lock, Image as ImageIcon } from 'lucide-react';
 import { getNextId } from '../services/idService';
 
@@ -422,7 +423,19 @@ const RegistersView: React.FC<RegistersViewProps> = (props) => {
 
                   if (file.content.startsWith('data:')) {
                       console.log('Arquivo detectado como binário (PDF/Imagem)');
-                      textToAnalyze = `Arquivo: ${file.name}\nTipo: ${file.name.toLowerCase().endsWith('.pdf') ? 'PDF' : 'Imagem'}\n\nEste é um documento de identificação ou comprovante. Extraia informações de proprietário se possível com base no nome do arquivo.`;
+
+                      if (isPDF(file.name)) {
+                          try {
+                              console.log('Extraindo texto do PDF...');
+                              textToAnalyze = await extractTextFromPDF(file.content);
+                              console.log('Texto extraído do PDF:', textToAnalyze.substring(0, 200));
+                          } catch (pdfError) {
+                              console.error('Erro ao extrair texto do PDF:', pdfError);
+                              textToAnalyze = `Arquivo PDF: ${file.name}\n\nNão foi possível extrair texto automaticamente. Documento anexado para referência.`;
+                          }
+                      } else {
+                          textToAnalyze = `Arquivo: ${file.name}\nTipo: Imagem\n\nEste é um documento de identificação ou comprovante. Extraia informações de proprietário se possível com base no nome do arquivo.`;
+                      }
                   } else if (file.content.length > 5000) {
                       textToAnalyze = file.content.substring(0, 5000);
                       console.log(`Texto longo detectado, usando primeiros 5000 caracteres`);
