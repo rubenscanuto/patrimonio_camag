@@ -306,24 +306,51 @@ export const aiConfigsService = {
   },
 
   async create(config: AIConfig) {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('Not authenticated');
+    console.log('[aiConfigsService] Starting create with config:', {
+      id: config.id,
+      label: config.label,
+      provider: config.provider,
+      modelName: config.modelName
+    });
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError) {
+      console.error('[aiConfigsService] Auth error:', authError);
+      throw new Error(`Erro de autenticação: ${authError.message}`);
+    }
+
+    if (!user) {
+      console.error('[aiConfigsService] No user found');
+      throw new Error('Usuário não autenticado. Faça login novamente.');
+    }
+
+    console.log('[aiConfigsService] User authenticated:', user.id);
+
+    const insertData = {
+      id: config.id,
+      user_id: user.id,
+      label: config.label,
+      provider: config.provider,
+      api_key: config.apiKey,
+      model_name: config.modelName,
+      is_active: config.isActive,
+    };
+
+    console.log('[aiConfigsService] Inserting data:', { ...insertData, api_key: '***hidden***' });
 
     const { data, error } = await supabase
       .from('ai_configs')
-      .insert({
-        id: config.id,
-        user_id: user.id,
-        label: config.label,
-        provider: config.provider,
-        api_key: config.apiKey,
-        model_name: config.modelName,
-        is_active: config.isActive,
-      })
+      .insert(insertData)
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('[aiConfigsService] Insert error:', error);
+      throw new Error(`Erro ao salvar no banco: ${error.message}`);
+    }
+
+    console.log('[aiConfigsService] Successfully created AI config:', data.id);
     return convertAIConfigFromDB(data);
   },
 
