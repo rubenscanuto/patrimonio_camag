@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, FolderOpen, Database, Building2, ClipboardList, Loader2 } from 'lucide-react';
+import { LayoutDashboard, FolderOpen, Database, Building2, ClipboardList, Loader2, Settings } from 'lucide-react';
 import Dashboard from './components/Dashboard';
 import DocumentVault from './components/DocumentVault';
 import RegistersView from './components/RegistersView';
 import AssetManager from './components/AssetManager';
 import AuditView from './components/AuditView';
+import SettingsView from './components/SettingsView';
 import AuthScreen from './components/AuthScreen';
 import { Property, Document, Employee, PropertyTag, AIConfig, UserProfile, MonthlyIndexData, Owner, CloudAccount, LogEntry, TrashItem } from './types';
 import { fetchHistoricalIndices } from './services/geminiService';
@@ -132,7 +133,7 @@ const INITIAL_EMPLOYEES: Employee[] = [
   { id: 'C_3', name: 'Roberto Alencar', role: 'Manutenção', assignedProperties: ['I_2'], contact: '(11) 97777-7777', activeTasks: 1, status: 'On Leave' },
 ];
 
-type ViewState = 'dashboard' | 'assets' | 'documents' | 'registers' | 'audit';
+type ViewState = 'dashboard' | 'assets' | 'documents' | 'registers' | 'audit' | 'settings';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewState>('dashboard');
@@ -753,6 +754,7 @@ const App: React.FC = () => {
           <NavItem view="documents" icon={FolderOpen} label="Documentos" />
           <NavItem view="registers" icon={Database} label="Cadastros" />
           <NavItem view="audit" icon={ClipboardList} label="Auditoria e Controle" />
+          <NavItem view="settings" icon={Settings} label="Configurações" />
         </nav>
 
         <div className="mt-auto pt-6 border-t border-slate-100 shrink-0">
@@ -859,7 +861,7 @@ const App: React.FC = () => {
           )}
 
           {currentView === 'audit' && (
-            <AuditView 
+            <AuditView
               logs={logs}
               trash={trash}
               onRestoreFromTrash={handleRestoreFromTrash}
@@ -869,6 +871,23 @@ const App: React.FC = () => {
               employees={employees}
               tags={tags}
               aiConfig={activeAIConfig}
+            />
+          )}
+
+          {currentView === 'settings' && (
+            <SettingsView
+              userProfile={userProfile}
+              onUpdateProfile={setUserProfile}
+              aiConfigs={aiConfigs}
+              onAddAIConfig={handleAddAIConfig}
+              onDeleteAIConfig={handleDeleteAIConfig}
+              onSetActiveAIConfig={handleSetActiveAIConfig}
+              cloudAccounts={cloudAccounts}
+              onAddCloudAccount={handleAddCloudAccount}
+              onDeleteCloudAccount={handleDeleteCloudAccount}
+              indicesDatabase={indicesDatabase}
+              onForceUpdateIndices={handleForceUpdateIndices}
+              isUpdatingIndices={isUpdatingIndices}
             />
           )}
         </div>
