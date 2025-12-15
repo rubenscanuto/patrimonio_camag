@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Document, DocumentCategory, Property, AIConfig, Owner, AIAnalysisResult } from '../types';
 import { FileText, Upload, Search, Tag, AlertTriangle, Calendar, DollarSign, Loader2, Filter, User, Building, CheckSquare, Square, Trash2, Eye, X, Download, Save, Sparkles, Eraser, CloudUpload, ChevronDown, CheckCircle, Link, File, FileSpreadsheet, List } from 'lucide-react';
-import { analyzeDocumentContent, AnalyzableFile } from '../services/geminiService';
+import { analyzeDocumentContent, AnalyzableFile, AnalysisContextType } from '../services/geminiService';
 import { getNextId } from '../services/idService';
 
 // ... (Standard Interfaces)
@@ -22,7 +22,7 @@ interface DocumentVaultProps {
   
   // New props for auto-open and data filling
   alwaysShowUpload?: boolean;
-  analysisContext?: 'General' | 'PropertyCreation' | 'OwnerCreation';
+  analysisContext?: AnalysisContextType;
   onAnalysisComplete?: (result: AIAnalysisResult) => void;
 }
 
@@ -257,7 +257,7 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({
                     analyzableFiles, 
                     aiConfig.apiKey, 
                     aiConfig.modelName,
-                    analysisContext // Pass specific context (PropertyCreation/OwnerCreation)
+                    analysisContext as AnalysisContextType // Pass specific context (PropertyCreation/OwnerCreation)
                 );
                 aiResult = { ...analysis };
 
@@ -313,7 +313,7 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({
                 if (matches && matches.length === 3) analyzableFiles.push({ mimeType: matches[1], data: matches[2] });
           } else { textContext = doc.contentRaw || ''; }
 
-          const analysis = await analyzeDocumentContent(textContext, analyzableFiles, aiConfig.apiKey, aiConfig.modelName, analysisContext);
+          const analysis = await analyzeDocumentContent(textContext, analyzableFiles, aiConfig.apiKey, aiConfig.modelName, analysisContext as AnalysisContextType);
           const updatedDoc = {
               ...doc, category: analysis.category, summary: analysis.summary,
               aiAnalysis: { riskLevel: analysis.riskLevel, keyDates: analysis.keyDates, monetaryValues: analysis.monetaryValues },
@@ -339,7 +339,7 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({
                 if (matches && matches.length === 3) analyzableFiles.push({ mimeType: matches[1], data: matches[2] });
           } else { textContext = doc.contentRaw || ''; }
 
-          const analysis = await analyzeDocumentContent(textContext, analyzableFiles, aiConfig.apiKey, aiConfig.modelName, analysisContext);
+          const analysis = await analyzeDocumentContent(textContext, analyzableFiles, aiConfig.apiKey, aiConfig.modelName, analysisContext as AnalysisContextType);
           const updatedDoc = {
               ...doc, category: analysis.category, summary: analysis.summary,
               aiAnalysis: { riskLevel: analysis.riskLevel, keyDates: analysis.keyDates, monetaryValues: analysis.monetaryValues },
@@ -520,7 +520,23 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({
                       </div>
 
                       <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => { if (doc.extractedData) setEditingDataDoc(doc); else handleRunAI(doc); }} className={`p-1.5 rounded transition-colors ${doc.extractedData ? 'text-indigo-600 hover:bg-indigo-50' : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'}`} title={doc.extractedData ? "Dados Extraídos" : "Analisar com IA"}>{doc.extractedData ? <FileSpreadsheet size={16} /> : <Sparkles size={16} />}</button>
+                          {(doc.extractedData || doc.aiAnalysis || doc.summary) ? (
+                              <button 
+                                onClick={() => setEditingDataDoc(doc)} 
+                                className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded transition-colors" 
+                                title="Ver Resultado da Análise IA"
+                              >
+                                  <FileSpreadsheet size={16} />
+                              </button>
+                          ) : (
+                              <button 
+                                onClick={() => handleRunAI(doc)} 
+                                className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors" 
+                                title="Analisar com IA"
+                              >
+                                  <Sparkles size={16} />
+                              </button>
+                          )}
                           <button onClick={() => setViewingDoc(doc)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded" title="Visualizar"><Eye size={16} /></button>
                           <button onClick={() => handleDownload(doc)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded" title="Download"><Download size={16} /></button>
                           <button onClick={() => { if(confirm(`Excluir ${doc.name}?`)) onDeleteDocument(doc.id); }} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded" title="Excluir"><Trash2 size={16} /></button>

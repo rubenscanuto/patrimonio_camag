@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, FolderOpen, Database, Building2, ClipboardList } from 'lucide-react';
+import { LayoutDashboard, FolderOpen, Database, Building2, ClipboardList, LogOut } from 'lucide-react';
 import Dashboard from './components/Dashboard';
 import DocumentVault from './components/DocumentVault';
 import RegistersView from './components/RegistersView';
 import AssetManager from './components/AssetManager';
 import AuditView from './components/AuditView';
+import LoginView from './components/LoginView';
 import { Property, Document, Employee, PropertyTag, AIConfig, UserProfile, MonthlyIndexData, Owner, CloudAccount, LogEntry, TrashItem } from './types';
 import { fetchHistoricalIndices } from './services/geminiService';
 import { getNextId } from './services/idService';
@@ -133,6 +134,7 @@ const loadState = <T,>(key: string, fallback: T): T => {
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewState>('dashboard');
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => !!localStorage.getItem('patrimonio_auth'));
   
   // Persistent States
   const [properties, setProperties] = useState<Property[]>(() => loadState('patrimonio_properties', INITIAL_PROPERTIES));
@@ -182,6 +184,19 @@ const App: React.FC = () => {
   useEffect(() => { localStorage.setItem('indicesDatabase', JSON.stringify(indicesDatabase)); }, [indicesDatabase]);
 
   const activeAIConfig = aiConfigs.find(c => c.isActive);
+
+  // --- Auth Handlers ---
+  const handleLogin = (email: string) => {
+    localStorage.setItem('patrimonio_auth', 'true');
+    setIsAuthenticated(true);
+    setUserProfile(prev => ({ ...prev, email: email }));
+    addLog('System' as any, 'System', `Login de usuário: ${email}`);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('patrimonio_auth');
+    setIsAuthenticated(false);
+  };
 
   // --- Helper Functions for Logging and Trash ---
 
@@ -399,6 +414,11 @@ const App: React.FC = () => {
     </button>
   );
 
+  // Authentication Gate
+  if (!isAuthenticated) {
+    return <LoginView onLogin={handleLogin} />;
+  }
+
   return (
     <div className="h-screen w-full bg-slate-50 flex flex-col md:flex-row font-sans text-slate-900 overflow-hidden">
       
@@ -417,10 +437,18 @@ const App: React.FC = () => {
           <NavItem view="audit" icon={ClipboardList} label="Auditoria e Controle" />
         </nav>
 
-        <div className="mt-auto pt-6 border-t border-slate-100 shrink-0">
+        <div className="mt-auto pt-6 border-t border-slate-100 shrink-0 space-y-4">
           
+          <button 
+            onClick={handleLogout}
+            className="w-full flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors"
+          >
+            <LogOut size={18} />
+            Sair do Sistema
+          </button>
+
           {/* Active AI Config Indicator */}
-          <div className="px-4 mt-2">
+          <div className="px-4">
             <div className="text-[10px] uppercase text-slate-400 font-bold tracking-wider mb-1">IA Ativa</div>
             <div className="flex items-center gap-2 text-xs text-slate-600 bg-slate-50 p-2 rounded border border-slate-100 truncate" title={activeAIConfig?.modelName}>
                 <div className={`w-2 h-2 rounded-full ${activeAIConfig ? 'bg-green-500' : 'bg-red-500'}`}></div>

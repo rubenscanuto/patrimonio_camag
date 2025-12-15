@@ -19,6 +19,8 @@ export interface AnalyzableFile {
   data: string; // Base64 string sem prefixo
 }
 
+export type AnalysisContextType = 'General' | 'PropertyCreation' | 'OwnerCreation';
+
 const BCB_SERIES_CODES: Record<string, number> = {
   'IPCA': 433,
   'IGPM': 189,
@@ -264,7 +266,7 @@ export const analyzeDocumentContent = async (
     files: AnalyzableFile[],
     apiKey: string, 
     modelName: string, 
-    type: 'General' | 'PropertyCreation' | 'OwnerCreation' = 'General'
+    type: AnalysisContextType = 'General'
 ): Promise<AIAnalysisResult> => {
   if (!apiKey) throw new Error("API Key required");
   const ai = getAIClient(apiKey);
