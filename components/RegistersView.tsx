@@ -322,8 +322,8 @@ const RegistersView: React.FC<RegistersViewProps> = (props) => {
                             <div className="flex border-b border-slate-200 px-6 shrink-0"><button onClick={() => setOwnerModalTab('Data')} className={`py-3 px-4 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${ownerModalTab === 'Data' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-indigo-600'}`}><User size={16}/> Dados Cadastrais</button><button onClick={() => setOwnerModalTab('Documents')} className={`py-3 px-4 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${ownerModalTab === 'Documents' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-indigo-600'}`}><FileText size={16}/> Documentos ({docsToShow.length})</button></div>
 
                             <div className="flex flex-1 overflow-hidden">
-                                <div className="flex-1 overflow-y-auto p-6 bg-slate-50">
-                                    {ownerModalTab === 'Data' ? (
+                                {ownerModalTab === 'Data' ? (
+                                    <div className="flex-1 overflow-y-auto p-6 bg-slate-50">
                                         <form id="ownerForm" className="space-y-6" onSubmit={(e) => e.preventDefault()}>
                                             {/* Photo Upload */}
                                             <div className="flex justify-center mb-6">
@@ -457,7 +457,9 @@ const RegistersView: React.FC<RegistersViewProps> = (props) => {
                                                 </div>
                                             </div>
                                         </form>
-                                    ) : (
+                                    </div>
+                                ) : (
+                                    <div className="flex-1 overflow-hidden p-6 flex flex-col">
                                         <div className="h-full flex flex-col">
                                             <DocumentVault 
                                                 documents={docsToShow}
@@ -475,8 +477,8 @@ const RegistersView: React.FC<RegistersViewProps> = (props) => {
                                                 onAnalysisComplete={handleAiDataMerge}
                                             />
                                         </div>
-                                    )}
-                                </div>
+                                    </div>
+                                )}
                             </div>
                             <div className="p-6 border-t border-slate-100 bg-white rounded-b-xl flex justify-end gap-3 shrink-0"><button onClick={() => setShowOwnerModal(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">Cancelar</button><button onClick={handleSaveOwner} className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-medium shadow-lg shadow-indigo-200 transition-colors flex items-center gap-2"><Save size={18}/> {isEditingOwner ? 'Salvar Alterações' : 'Cadastrar Proprietário'}</button></div>
                         </div>

@@ -340,8 +340,8 @@ const AssetManager: React.FC<AssetManagerProps> = ({
             </div>
 
             <div className="flex flex-1 overflow-hidden">
-                <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                    {activeTab === 'Info' && (
+                {activeTab === 'Info' && (
+                    <div className="flex-1 overflow-y-auto p-6 space-y-6">
                         <form id="propForm" onSubmit={handleSubmit} className="space-y-4">
                             {/* ... (Existing Info Form Fields) ... */}
                             <div className="mb-4">
@@ -357,9 +357,11 @@ const AssetManager: React.FC<AssetManagerProps> = ({
                                 <div><label className="block text-sm font-bold text-slate-700 mb-1">Status</label><select className="w-full border border-slate-300 p-2 rounded" value={newProp.status} onChange={e => setNewProp({...newProp, status: e.target.value as any})}><option value="Occupied">Ocupado</option><option value="Vacant">Vago</option><option value="Under Maintenance">Em Manutenção</option></select></div>
                             </div>
                         </form>
-                    )}
+                    </div>
+                )}
 
-                    {activeTab === 'Docs' && (
+                {activeTab === 'Docs' && (
+                    <div className="flex-1 overflow-hidden p-6 flex flex-col">
                         <div className="h-full flex flex-col">
                             <DocumentVault 
                                 documents={docsToShow}
@@ -377,8 +379,9 @@ const AssetManager: React.FC<AssetManagerProps> = ({
                                 onAnalysisComplete={handleAiDataMerge}
                             />
                         </div>
-                    )}
-                </div>
+                    </div>
+                )}
+                
                 {aiSummary && (<div className="w-80 bg-indigo-50 border-l border-indigo-100 p-6 overflow-y-auto"><div className="flex items-center gap-2 mb-4 text-indigo-700 font-bold"><Sparkles size={20} /><h4>Resumo Inteligente</h4></div><div className="bg-white p-4 rounded-lg shadow-sm text-sm whitespace-pre-wrap border border-indigo-100">{aiSummary}</div></div>)}
             </div>
              <div className="p-6 border-t border-slate-100 flex justify-end gap-2 bg-slate-50 rounded-b-xl shrink-0">

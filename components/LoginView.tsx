@@ -83,7 +83,7 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
               <input
                 type="email"
                 required
-                className="block w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-slate-50 focus:bg-white transition-all outline-none"
+                className="block w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-slate-50 focus:bg-white text-slate-900 transition-all outline-none"
                 placeholder="admin@patrimonio360.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -100,7 +100,7 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
               <input
                 type="password"
                 required
-                className="block w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-slate-50 focus:bg-white transition-all outline-none"
+                className="block w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-slate-50 focus:bg-white text-slate-900 transition-all outline-none"
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}

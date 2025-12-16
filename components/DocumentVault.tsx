@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Document, DocumentCategory, Property, AIConfig, Owner, AIAnalysisResult } from '../types';
-import { FileText, Upload, Search, Tag, AlertTriangle, Calendar, DollarSign, Loader2, Filter, User, Building, CheckSquare, Square, Trash2, Eye, X, Download, Save, Sparkles, Eraser, CloudUpload, ChevronDown, CheckCircle, Link, File, FileSpreadsheet, List } from 'lucide-react';
+import { FileText, Upload, Search, Tag, AlertTriangle, Calendar, DollarSign, Loader2, Filter, User, Building, CheckSquare, Square, Trash2, Eye, X, Download, Save, Sparkles, Eraser, CloudUpload, ChevronDown, CheckCircle, Link, File, FileSpreadsheet, List, Image as ImageIcon } from 'lucide-react';
 import { analyzeDocumentContent, AnalyzableFile, AnalysisContextType } from '../services/geminiService';
 import { getNextId } from '../services/idService';
 
@@ -136,7 +136,12 @@ const DocumentDataModal: React.FC<{ doc: Document; onClose: () => void; onSave: 
                             {Object.entries(formData).map(([key, val]) => (
                                 <div key={key} className="flex gap-2 items-center">
                                     <input type="text" value={key} readOnly className="w-1/3 text-xs font-semibold bg-slate-100 border-transparent rounded p-2 text-slate-600" />
-                                    <input type="text" value={val} onChange={(e) => setFormData({...formData, [key]: e.target.value})} className="flex-1 text-sm border border-slate-200 rounded p-2 text-slate-800 focus:border-indigo-500 outline-none" />
+                                    <input 
+                                      type="text" 
+                                      value={val} 
+                                      onChange={(e) => setFormData({...formData, [key]: e.target.value})} 
+                                      className="flex-1 text-sm border border-slate-200 rounded p-2 text-slate-800 bg-white focus:border-indigo-500 outline-none" 
+                                    />
                                     <button onClick={() => handleRemoveField(key)} className="text-slate-400 hover:text-red-500 p-1"><X size={14}/></button>
                                 </div>
                             ))}
@@ -144,8 +149,8 @@ const DocumentDataModal: React.FC<{ doc: Document; onClose: () => void; onSave: 
                         </div>
 
                         <div className="flex gap-2 items-center bg-slate-50 p-2 rounded border border-slate-200">
-                            <input type="text" placeholder="Novo Campo" value={newKey} onChange={e => setNewKey(e.target.value)} className="w-1/3 text-xs p-2 border border-slate-300 rounded" />
-                            <input type="text" placeholder="Valor" value={newValue} onChange={e => setNewValue(e.target.value)} className="flex-1 text-sm p-2 border border-slate-300 rounded" />
+                            <input type="text" placeholder="Novo Campo" value={newKey} onChange={e => setNewKey(e.target.value)} className="w-1/3 text-xs p-2 border border-slate-300 rounded bg-white" />
+                            <input type="text" placeholder="Valor" value={newValue} onChange={e => setNewValue(e.target.value)} className="flex-1 text-sm p-2 border border-slate-300 rounded bg-white" />
                             <button onClick={handleAddField} disabled={!newKey || !newValue} className="bg-indigo-600 text-white p-2 rounded hover:bg-indigo-700 disabled:opacity-50"><Save size={14}/></button>
                         </div>
                     </div>
@@ -232,62 +237,70 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({
   const handleUploadAction = async (process: boolean) => {
     if (pendingDocs.length === 0) return;
     if (process && !aiConfig) { alert("Configure uma chave de API nas Configurações primeiro para processar com IA."); return; }
+    
     setIsAnalyzing(true);
-    for (const doc of pendingDocs) {
-        let aiResult: AIAnalysisResult = { category: 'Uncategorized', summary: process ? 'Processamento falhou.' : 'Upload manual (sem IA).', riskLevel: 'Low', keyDates: [], monetaryValues: [], structuredData: {} };
-        let linkedPropId = doc.selectedPropertyId;
-        let linkedOwnerId = doc.selectedOwnerId;
+    
+    try {
+        for (const doc of pendingDocs) {
+            let aiResult: AIAnalysisResult = { category: 'Uncategorized', summary: process ? 'Processamento falhou.' : 'Upload manual (sem IA).', riskLevel: 'Low', keyDates: [], monetaryValues: [], structuredData: {} };
+            let linkedPropId = doc.selectedPropertyId;
+            let linkedOwnerId = doc.selectedOwnerId;
 
-        if (process && aiConfig) {
-            try {
-                const analyzableFiles: AnalyzableFile[] = [];
-                let textContext = "";
-                if (doc.content.startsWith('data:')) {
-                     const matches = doc.content.match(/^data:(.+);base64,(.+)$/);
-                     if (matches && matches.length === 3) analyzableFiles.push({ mimeType: matches[1], data: matches[2] });
-                } else { textContext = doc.content; }
+            if (process && aiConfig) {
+                try {
+                    const analyzableFiles: AnalyzableFile[] = [];
+                    let textContext = "";
+                    if (doc.content.startsWith('data:')) {
+                        const matches = doc.content.match(/^data:(.+);base64,(.+)$/);
+                        if (matches && matches.length === 3) analyzableFiles.push({ mimeType: matches[1], data: matches[2] });
+                    } else { textContext = doc.content; }
 
-                // Add context to prompt if available
-                let contextPrompt = textContext;
-                if (preSelectedPropertyId) contextPrompt = "Contexto: Documento de Imóvel. " + textContext;
-                if (preSelectedOwnerId) contextPrompt = "Contexto: Documento de Proprietário/Pessoa. " + textContext;
+                    // Add context to prompt if available
+                    let contextPrompt = textContext;
+                    if (preSelectedPropertyId) contextPrompt = "Contexto: Documento de Imóvel. " + textContext;
+                    if (preSelectedOwnerId) contextPrompt = "Contexto: Documento de Proprietário/Pessoa. " + textContext;
 
-                const analysis = await analyzeDocumentContent(
-                    contextPrompt, 
-                    analyzableFiles, 
-                    aiConfig.apiKey, 
-                    aiConfig.modelName,
-                    analysisContext as AnalysisContextType // Pass specific context (PropertyCreation/OwnerCreation)
-                );
-                aiResult = { ...analysis };
+                    const analysis = await analyzeDocumentContent(
+                        contextPrompt, 
+                        analyzableFiles, 
+                        aiConfig.apiKey, 
+                        aiConfig.modelName,
+                        analysisContext as AnalysisContextType // Pass specific context (PropertyCreation/OwnerCreation)
+                    );
+                    aiResult = { ...analysis };
 
-                // Propagate result up for form filling
-                if (onAnalysisComplete) {
-                    onAnalysisComplete(analysis);
-                }
+                    // Propagate result up for form filling
+                    if (onAnalysisComplete) {
+                        onAnalysisComplete(analysis);
+                    }
 
-                // Only auto-link if not already set by context
-                if (!linkedPropId && !linkedOwnerId) {
-                    const text = (analysis.summary || doc.name).toLowerCase();
-                    const matchedProp = properties.find(p => text.includes(p.name.toLowerCase()) || text.includes(p.address.toLowerCase()));
-                    if (matchedProp) linkedPropId = matchedProp.id;
-                    const matchedOwner = owners.find(o => text.includes(o.name.toLowerCase()) || (o.document && text.includes(o.document)));
-                    if (matchedOwner) linkedOwnerId = matchedOwner.id;
-                }
-            } catch (e) { console.error("Failed to analyze doc", doc.name, e); aiResult.summary = "Erro na análise de IA."; }
+                    // Only auto-link if not already set by context
+                    if (!linkedPropId && !linkedOwnerId) {
+                        const text = (analysis.summary || doc.name).toLowerCase();
+                        const matchedProp = properties.find(p => text.includes(p.name.toLowerCase()) || text.includes(p.address.toLowerCase()));
+                        if (matchedProp) linkedPropId = matchedProp.id;
+                        const matchedOwner = owners.find(o => text.includes(o.name.toLowerCase()) || (o.document && text.includes(o.document)));
+                        if (matchedOwner) linkedOwnerId = matchedOwner.id;
+                    }
+                } catch (e) { console.error("Failed to analyze doc", doc.name, e); aiResult.summary = "Erro na análise de IA."; }
+            }
+
+            const newDoc: Document = {
+            id: getNextId('Document'), name: doc.name, uploadDate: new Date().toLocaleDateString('pt-BR'), contentRaw: doc.content,
+            category: aiResult.category, summary: aiResult.summary, relatedPropertyId: linkedPropId, relatedOwnerId: linkedOwnerId,
+            aiAnalysis: { riskLevel: aiResult.riskLevel, keyDates: aiResult.keyDates, monetaryValues: aiResult.monetaryValues },
+            extractedData: aiResult.structuredData
+            };
+            onAddDocument(newDoc);
         }
-
-        const newDoc: Document = {
-          id: getNextId('Document'), name: doc.name, uploadDate: new Date().toLocaleDateString('pt-BR'), contentRaw: doc.content,
-          category: aiResult.category, summary: aiResult.summary, relatedPropertyId: linkedPropId, relatedOwnerId: linkedOwnerId,
-          aiAnalysis: { riskLevel: aiResult.riskLevel, keyDates: aiResult.keyDates, monetaryValues: aiResult.monetaryValues },
-          extractedData: aiResult.structuredData
-        };
-        onAddDocument(newDoc);
+    } catch (e) {
+        console.error("Error in batch upload", e);
+        alert("Erro no processamento dos documentos. Verifique o console.");
+    } finally {
+        setIsAnalyzing(false); 
+        if(!alwaysShowUpload) setIsUploading(false); // Only close if not in always-show mode
+        setPendingDocs([]);
     }
-    setIsAnalyzing(false); 
-    if(!alwaysShowUpload) setIsUploading(false); // Only close if not in always-show mode
-    setPendingDocs([]);
   };
 
   const handleDownload = (doc: Document) => {
@@ -537,6 +550,13 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({
                                   <Sparkles size={16} />
                               </button>
                           )}
+                          <button 
+                            onClick={() => setViewingDoc(doc)} 
+                            className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors" 
+                            title="Exibir Imagem do Documento"
+                          >
+                            <ImageIcon size={16} />
+                          </button>
                           <button onClick={() => setViewingDoc(doc)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded" title="Visualizar"><Eye size={16} /></button>
                           <button onClick={() => handleDownload(doc)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded" title="Download"><Download size={16} /></button>
                           <button onClick={() => { if(confirm(`Excluir ${doc.name}?`)) onDeleteDocument(doc.id); }} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded" title="Excluir"><Trash2 size={16} /></button>
